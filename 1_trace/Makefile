@@ -10,7 +10,7 @@ TARGET=$(PROGRAM)-$(OS)-$(PROC)
 
 CC=gcc
 CFLAGS=-Wall -g
-LDFLAGS=-lm
+LDFLAGS=-lpcap
 SRC=$(wildcard *.c)
 HEADERS=$(wildcard *.h)
 OBJECTS=$(patsubst %.c, %.o, $(SRC))
