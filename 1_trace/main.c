@@ -1,23 +1,23 @@
 // main
 // trace
 
-#include "trace.h"
-#include <stdio.h>
 #include <pcap/pcap.h>
+#include "trace.h"
 
 void usage()
 {
 	printf("usage:\n\ttrace <pcap filename> \n");
 }
 
-int main(int argc, char const *argv[])
+int main(int argc, char **argv)
 {
 	char *inputFileName = NULL;
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *p = NULL;
-	struct pcap_pkthdr *pkt_header;
-	u_char *pkt_data = NULL;
-	int pcap_status = 1;
+	struct pcap_pkthdr *packetHeader;
+	u_char *packetData = NULL;
+	int pcapStatus = 1;
+	int packetCount = 0;
 
 	if (argc == 2) {
 		inputFileName = argv[1];
@@ -27,12 +27,17 @@ int main(int argc, char const *argv[])
 		exit(1);
 	}
 
-
 	p = pcap_open_offline(inputFileName, errbuf);
-	while (pcap_status == 1) {
-		pcap_status =  pcap_next_ex(p, &pkt_header, &pkt_data);
-		// begin decoding the file
-		printf("readpacket\n");
+	if (p == NULL) {
+		printf("ERROR: %s\n", errbuf);
+		exit(2);
+	}
+	while (pcapStatus == 1) {
+		pcapStatus =  pcap_next_ex(p, &packetHeader, (const u_char **)&packetData);
+		printf("Packet number: %d  Packet Len: %d\n\n", ++packetCount, packetHeader->len);
+		ethernet(packetData, packetHeader->len);
+		printf("\n\n");
+
 	}
 	pcap_close(p);
 	

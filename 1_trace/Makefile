@@ -6,7 +6,8 @@ PROGRAM=trace
 
 OS = $(shell uname -s)
 PROC = $(shell uname -p)
-TARGET=$(PROGRAM)-$(OS)-$(PROC)
+TARGET=$(PROGRAM)
+#-$(OS)-$(PROC)
 
 CC=gcc
 CFLAGS=-Wall -g
