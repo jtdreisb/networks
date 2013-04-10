@@ -32,14 +32,18 @@ int main(int argc, char **argv)
 		printf("ERROR: %s\n", errbuf);
 		exit(2);
 	}
-	while (pcapStatus == 1) {
-		pcapStatus =  pcap_next_ex(p, &packetHeader, (const u_char **)&packetData);
-		printf("Packet number: %d  Packet Len: %d\n\n", ++packetCount, packetHeader->len);
-		ethernet(packetData, packetHeader->len);
-		printf("\n\n");
-
+	while (1) {
+		pcapStatus = pcap_next_ex(p, &packetHeader, (const u_char **)&packetData);
+		if (pcapStatus == 1) {
+			printf("Packet number: %d  Packet Len: %d\n\n", ++packetCount, packetHeader->len);
+			ethernet(packetData, packetHeader->len);
+			printf("\n\n");
+		}
+		else {
+			break;
+		}
 	}
 	pcap_close(p);
-	
+
 	return 0;
 }
