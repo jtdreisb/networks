@@ -1,0 +1,165 @@
+<h1>Homework 1 (April 10, 2013)</h1>
+
+<p>Jason Dreisbach</p>
+
+<h2>1. Read Chapter 1</h2>
+
+<p>Okie Dokie</p>
+
+<h2>2. OSI Network Model</h2>
+
+<h3>The 7 Layer Model</h3>
+
+<h4>1. Physical</h4>
+
+<p>The physical layer provides the actual transmission of data to the wire. It handles reading and writing data to the wire on the bit level.</p>
+
+<h4>2. Data Link</h4>
+
+<p>The data link layer provides the physical addressing of devices on the network. This is often associated with the hardware MAC address.</p>
+
+<h4>3. Network</h4>
+
+<p>The network layer provides the routing information for packet forwarding through multiple routers. It is the logical address of the device with respect to the network.</p>
+
+<h4>4. Transport</h4>
+
+<p>The transport layer provides the protocol for which the bits will be transmitted to the intended target machines. For example, TCP and UDP are transport protocols that designate different behavior when transmitting the application data.</p>
+
+<h4>5. Session</h4>
+
+<p>The session layer handles connection management. It will automatically try to provide live connections when the an application needs them.</p>
+
+<h4>6. Presentation</h4>
+
+<p>The presentation layer dictates how application data is serialized to be sent across the network. For example, protocol buffers are a possible presentation layer.</p>
+
+<h4>7. Application</h4>
+
+<p>The application layer is responsible for deserializing and displaying the information to the user in an acceptable format.</p>
+
+<h2>3. RFC's</h2>
+
+<h4>a. What is an RFC?</h4>
+
+<p>A request for comment (RFC) is a document published to describe methods, behavior, or research.</p>
+
+<h4>b. Who can write an RFC?</h4>
+
+<p>Anyone can submit an independent internet draft of an RFC for review by a RFC editor. Once it is reviewed and approved it may be published.</p>
+
+<h4>c. RFC 1541</h4>
+
+<ul>
+<li><strong>Purpose:</strong> The Dynamic Host Configuration Protocol (DHCP) provides a framework for passing configuration information to hosts on a TCP/IP network</li>
+<li><strong>Date:</strong> October 1993</li>
+<li><strong>Author:</strong> R. Droms</li>
+</ul>
+
+
+<h4>d. RFC 2104</h4>
+
+<ul>
+<li><strong>Purpose:</strong> HMAC: Keyed-Hashing for Message Authentication</li>
+<li><strong>Date:</strong> February 1997</li>
+<li><strong>Author:</strong> H. Krawczyk, M. Bellare, R. Canetti</li>
+</ul>
+
+
+<h4>e. RFC 5246</h4>
+
+<ul>
+<li><strong>Purpose:</strong> The Transport Layer Security (TLS) Protocol</li>
+<li><strong>Date:</strong> August 2008</li>
+<li><strong>Author:</strong> T. Dierks, E. Rescorla</li>
+</ul>
+
+
+<h2>4. IETF</h2>
+
+<h4>a. What is IETF?</h4>
+
+<p>The Internet Engineering Task Force (IETF) develops and promotes internet standards.</p>
+
+<h4>b. How do you become a member?</h4>
+
+<p>There is no membership. It is an open group. You must only participate.</p>
+
+<h4>c. The 6man IETF group</h4>
+
+<h3>5. IANA</h3>
+
+<h4>a. What's IANA stand for?</h4>
+
+<p>Internet Assigned Numbers Authority</p>
+
+<h4>b. What does it do?</h4>
+
+<p>IANA manages the IP addresses and domain names in the DNS root zone.</p>
+
+<h4>c. What are these ports?</h4>
+
+<ul>
+<li><strong>22:</strong> SSH</li>
+<li><strong>23:</strong> Telnet</li>
+<li><strong>53:</strong> UDP</li>
+<li><strong>80:</strong> HTTP</li>
+</ul>
+
+
+<h4>d. What are these protocol numbers?</h4>
+
+<p>A protocol number defines the communication standard that the transmission is using. So it is possible to use a nonstandard port for communication.
+* <strong>4:</strong> IPv4
+* <strong>6:</strong> TCP
+* <strong>17:</strong> UDP</p>
+
+<h3>6. DHCP</h3>
+
+<h4>a. What does DHCP stand for?</h4>
+
+<p>Dynamic Host Configuration Protocol</p>
+
+<h4>b. DHCP does what?</h4>
+
+<p>DHCP does the initial configuration of a host to allow for proper IP communications to occur over a LAN.</p>
+
+<h4>c. Process</h4>
+
+<ul>
+<li><strong>Discovery:</strong> The discover packet is sent out by a machine to discover the DHCP servers on the LAN</li>
+<li><strong>Offer:</strong> The DHCP responds with an available IP for the machine to take.</li>
+<li><strong>Request:</strong> The machine accepts the address from the server.</li>
+<li><strong>Acknowledgment:</strong> The server then acknowledges that the machine has secured the address.</li>
+</ul>
+
+
+<h3>7. ARP</h3>
+
+<h4>a. What does it stand for?</h4>
+
+<p>Address Resolution Protocol</p>
+
+<h4>b. What's its purpose?</h4>
+
+<p>ARP facilitates translating between network layer and link layer addresses.</p>
+
+<h4>c. How does it work?</h4>
+
+<p>The ARP protocol creates a table that maps the hardware address of a machine it its network address. It then is used to translate the values in the table when queried by the machine.</p>
+
+<h4>e. ARPing on subnet or off, what's the difference?</h4>
+
+<p>When the other device is off the LAN ARP does not cache the actual hardware address of the other device. Instead it caches the hardware address of the first intermediate device it reaches on the path to the intended target device.</p>
+
+<h4>d. Security Issues</h4>
+
+<p>ARP is susceptible to cache poisoning attacks which can lead to a man in the middle attack.</p>
+
+<h3>8. P2P vs Client Server</h3>
+
+<h4>a. Read 2.1.1 and 2.6</h4>
+
+<h4>b. What's the difference?</h4>
+
+<p>A P2P network may make equal transactions between the two peers where the client and server model requires all of the transactions to be initiated by the client.</p>
