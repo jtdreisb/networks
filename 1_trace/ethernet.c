@@ -7,8 +7,8 @@
 
 struct EthernetFrameHeader
 {
-	u_char destinationMAC[6];
-	u_char sourceMAC[6];
+	uint8_t destinationMAC[6];
+	uint8_t sourceMAC[6];
 	uint16_t etherType;
 } __attribute__((packed));
 
@@ -17,15 +17,15 @@ struct EthernetFrameHeader
 
 struct EthernetFrameTrailer
 {
-	u_char frameCheckSequence[4];
-	u_char interframeGap[12];
+	uint8_t frameCheckSequence[4];
+	uint8_t interframeGap[12];
 } __attribute__((packed));
 
 
-void ethernet(u_char *packetData, int packetLength)
+void ethernet(uint8_t *packetData, int packetLength)
 {
 	char *destination, *source;
-	u_char *nextFrame;
+	uint8_t *nextFrame;
 	int nextFrameLen;
 	struct EthernetFrameHeader *header = (struct EthernetFrameHeader *)packetData;
 

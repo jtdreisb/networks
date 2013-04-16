@@ -15,7 +15,7 @@ int main(int argc, char **argv)
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *p = NULL;
 	struct pcap_pkthdr *packetHeader;
-	u_char *packetData = NULL;
+	uint8_t *packetData = NULL;
 	int pcapStatus = 1;
 	int packetCount = 0;
 
@@ -33,7 +33,7 @@ int main(int argc, char **argv)
 		exit(2);
 	}
 	while (1) {
-		pcapStatus = pcap_next_ex(p, &packetHeader, (const u_char **)&packetData);
+		pcapStatus = pcap_next_ex(p, &packetHeader, (const uint8_t **)&packetData);
 		if (pcapStatus == 1) {
 			printf("\nPacket number: %d  Packet Len: %d\n\n", ++packetCount, packetHeader->len);
 			ethernet(packetData, packetHeader->len);

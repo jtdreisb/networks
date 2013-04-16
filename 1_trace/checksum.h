@@ -2,7 +2,9 @@
  * shadows@whitefang.com
  */
 
-unsigned short in_cksum(unsigned short *addr,int len);
+#include <stdint.h>
+
+uint16_t in_cksum(uint16_t *addr,int len);
 
 
 

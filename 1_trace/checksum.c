@@ -34,20 +34,18 @@
  * SUCH DAMAGE.
  */
 
+#include "checksum.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
 
 /*
  * in_cksum --
  *      Checksum routine for Internet Protocol family headers (C Version)
  */
-unsigned short in_cksum(unsigned short *addr,int len)
+uint16_t in_cksum(uint16_t *addr,int len)
 {
         register int sum = 0;
-        u_short answer = 0;
-        register u_short *w = addr;
+        uint16_t answer = 0;
+        register uint16_t *w = addr;
         register int nleft = len;
 
         /*
@@ -62,7 +60,7 @@ unsigned short in_cksum(unsigned short *addr,int len)
 
         /* mop up an odd byte, if necessary */
         if (nleft == 1) {
-                *(u_char *)(&answer) = *(u_char *)w ;
+                *(uint8_t *)(&answer) = *(uint8_t *)w ;
                 sum += answer;
         }
 
