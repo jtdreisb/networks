@@ -1,4 +1,4 @@
-/* Checksum declaration 
+/* Checksum declaration
  * shadows@whitefang.com
  */
 

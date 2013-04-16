@@ -15,7 +15,11 @@ LDFLAGS=-lpcap
 SRC=$(wildcard *.c)
 HEADERS=$(wildcard *.h)
 OBJECTS=$(patsubst %.c, %.o, $(SRC))
-TESTFILES=$(patsubst %.out.txt, %, $(wildcard files/*.out.txt))
+TESTFILES=\
+	ArpTest\
+	IP_bad_checksum\
+
+#$(patsubst %.out.txt, %, $(wildcard files/*.out.txt))
 
 
 ifeq ("$(OS)", "SunOS")
@@ -39,7 +43,7 @@ all: $(TARGET)
 clean:
 	rm -f $(OBJECTS) *~
 
-%.o : %.c
+%.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $^
 
 $(TARGET): $(OBJECTS) $(HEADERS)
@@ -47,6 +51,8 @@ $(TARGET): $(OBJECTS) $(HEADERS)
 
 test: $(TARGET)
 	@for testfile in $(TESTFILES); do\
-		echo $$testfile ;\
+		./trace files/$$testfile.pcap > files/$$testfile.my.out; \
+		diff -u files/$$testfile.my.out files/$$testfile.out.txt ;\
 	done
+
 

@@ -35,9 +35,9 @@ int main(int argc, char **argv)
 	while (1) {
 		pcapStatus = pcap_next_ex(p, &packetHeader, (const u_char **)&packetData);
 		if (pcapStatus == 1) {
-			printf("Packet number: %d  Packet Len: %d\n\n", ++packetCount, packetHeader->len);
+			printf("\nPacket number: %d  Packet Len: %d\n\n", ++packetCount, packetHeader->len);
 			ethernet(packetData, packetHeader->len);
-			printf("\n\n");
+			printf("\n");
 		}
 		else {
 			break;

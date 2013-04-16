@@ -25,6 +25,8 @@ struct EthernetFrameTrailer
 void ethernet(u_char *packetData, int packetLength)
 {
 	char *destination, *source;
+	u_char *nextFrame;
+	int nextFrameLen;
 	struct EthernetFrameHeader *header = (struct EthernetFrameHeader *)packetData;
 
 	printf("\tEthernet Header\n");
@@ -36,15 +38,19 @@ void ethernet(u_char *packetData, int packetLength)
 	printf("\t\tSource MAC: %s\n", source);
 
 	header->etherType = ntohs(header->etherType);
-	
+
+	nextFrame = packetData+sizeof(struct EthernetFrameHeader);
+	nextFrameLen = packetLength-(sizeof(struct EthernetFrameHeader)+sizeof(struct EthernetFrameTrailer));
+
 	printf("\t\tType: ");
+
 	if (header->etherType == 0x0806) {
 		printf("ARP\n\n");
-		arp(packetData+sizeof(struct EthernetFrameHeader), 
-			packetLength-(sizeof(struct EthernetFrameHeader)+sizeof(struct EthernetFrameTrailer)) );
+		arp(nextFrame, nextFrameLen);
 	}
 	else if (header->etherType == 0x0800) {
 		printf("IP\n\n");
+		ip(nextFrame, nextFrameLen);
 		// type = "IP"; // v4
 	}
 	else if (header->etherType == 0x86DD) {
@@ -56,6 +62,6 @@ void ethernet(u_char *packetData, int packetLength)
 		// type = "Unknown";
 	}
 
-	
+
 
 }
