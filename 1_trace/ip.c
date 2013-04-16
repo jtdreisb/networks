@@ -16,9 +16,9 @@ typedef enum {
 
 struct IPFrameHeader
 {
-	uint8_t ip_version_and_header_len;
+	uint8_t ip_version_and_header_length;
 	uint8_t ip_dscp_and_ecn;
-	uint16_t ip_total_len;
+	uint16_t ip_total_length;
 	uint16_t ip_identifier;
 	uint16_t ip_flags_and_fragment_offset;
 	uint8_t ip_time_to_live;
@@ -35,7 +35,7 @@ void ip(uint8_t *packetData, int packetLength)
 	uint16_t checksum;
 	struct in_addr netAddr;
 	uint8_t *nextFrame;
-	int nextFrameLen;
+	int nextFrameLength;
 	struct IPFrameHeader *header = (struct IPFrameHeader *)packetData;
 
 	printf("\tIP Header\n");
@@ -63,7 +63,7 @@ void ip(uint8_t *packetData, int packetLength)
 
 	printf("\t\tChecksum: ");
 
-	checksum = in_cksum((uint16_t *)packetData, header->ip_total_len);
+	checksum = in_cksum((uint16_t *)packetData, 10);
 	// unsigned short in_cksum(unsigned short *addr,int len);
 	header->ip_header_checksum = ntohs(header->ip_header_checksum);
 	if (checksum == 0) {
@@ -82,16 +82,16 @@ void ip(uint8_t *packetData, int packetLength)
 
 	// printf("%x, %x\n", checksum, header->ip_header_checksum);
 	nextFrame = packetData + sizeof(struct IPFrameHeader);
-	nextFrameLen = packetLength - sizeof(struct IPFrameHeader);
+	nextFrameLength = packetLength - sizeof(struct IPFrameHeader);
 	switch (header->ip_protocol) {
 		case IP_PROTO_ICMP:
-			icmp(nextFrame, nextFrameLen);
+			icmp(nextFrame, nextFrameLength);
 		break;
 		case IP_PROTO_TCP:
-			protocolName = "TCP";
+			tcp(nextFrame, nextFrameLength);
 		break;
 		case IP_PROTO_UDP:
-			protocolName = "UDP";
+			udp(nextFrame, nextFrameLength);
 		break;
 	}
 }

@@ -10,8 +10,8 @@ struct ARPFrameHeader
 {
 	uint16_t	arp_hardware_format;
 	uint16_t	arp_protocol_format;
-	uint8_t	arp_hardware_len;
-	uint8_t	arp_protocol_len;
+	uint8_t	arp_hardware_length;
+	uint8_t	arp_protocol_length;
 	uint16_t	arp_opcode;
 } __attribute__((packed));
 
@@ -55,14 +55,14 @@ void arp(uint8_t *packetData, int packetLength)
 	senderMAC = (uint8_t *)header+sizeof(struct ARPFrameHeader);
 	printf("\t\tSender MAC: %s\n", ether_ntoa((struct ether_addr *)senderMAC));
 
-	senderIP = (in_addr_t *)(senderMAC + header->arp_hardware_len);
+	senderIP = (in_addr_t *)(senderMAC + header->arp_hardware_length);
 	netAddr.s_addr = (in_addr_t)*senderIP;
 	printf("\t\tSender IP: %s\n", inet_ntoa(netAddr));
 
-	targetMAC = (uint8_t *)senderIP+header->arp_protocol_len;
+	targetMAC = (uint8_t *)senderIP+header->arp_protocol_length;
 	printf("\t\tTarget MAC: %s\n", ether_ntoa((struct ether_addr *)targetMAC));
 
-	targetIP = (in_addr_t *)(targetMAC + header->arp_hardware_len);
+	targetIP = (in_addr_t *)(targetMAC + header->arp_hardware_length);
 	netAddr.s_addr = (in_addr_t)*targetIP;
 	printf("\t\tTarget IP: %s\n", inet_ntoa(netAddr));
 

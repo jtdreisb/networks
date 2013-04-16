@@ -19,6 +19,16 @@ TESTFILES=\
 	ArpTest\
 	IP_bad_checksum\
 	PingTest\
+	smallTCP\
+	UDPfile\
+
+	# largeMix\
+	# largeMix2\
+
+
+	# TCP_bad_checksum\
+
+
 
 #$(patsubst %.out.txt, %, $(wildcard files/*.out.txt))
 
@@ -53,7 +63,7 @@ $(TARGET): $(OBJECTS) $(HEADERS)
 test: $(TARGET)
 	@for testfile in $(TESTFILES); do\
 		./trace files/$$testfile.pcap > files/$$testfile.my.out; \
-		diff -U 10 files/$$testfile.my.out files/$$testfile.out.txt ;\
+		diff -B -U 10 files/$$testfile.my.out files/$$testfile.out.txt ;\
 	done
 
 

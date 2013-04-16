@@ -26,7 +26,7 @@ void ethernet(uint8_t *packetData, int packetLength)
 {
 	char *destination, *source;
 	uint8_t *nextFrame;
-	int nextFrameLen;
+	int nextFrameLength;
 	struct EthernetFrameHeader *header = (struct EthernetFrameHeader *)packetData;
 
 	printf("\tEthernet Header\n");
@@ -40,17 +40,17 @@ void ethernet(uint8_t *packetData, int packetLength)
 	header->etherType = ntohs(header->etherType);
 
 	nextFrame = packetData+sizeof(struct EthernetFrameHeader);
-	nextFrameLen = packetLength-(sizeof(struct EthernetFrameHeader)+sizeof(struct EthernetFrameTrailer));
+	nextFrameLength = packetLength-(sizeof(struct EthernetFrameHeader)+sizeof(struct EthernetFrameTrailer));
 
 	printf("\t\tType: ");
 
 	if (header->etherType == 0x0806) {
 		printf("ARP\n\n");
-		arp(nextFrame, nextFrameLen);
+		arp(nextFrame, nextFrameLength);
 	}
 	else if (header->etherType == 0x0800) {
 		printf("IP\n\n");
-		ip(nextFrame, nextFrameLen);
+		ip(nextFrame, nextFrameLength);
 		// type = "IP"; // v4
 	}
 	else if (header->etherType == 0x86DD) {
