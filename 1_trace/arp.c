@@ -1,10 +1,6 @@
 // arp
 // trace
 
-// struct ARPFrameHeader
-// {
-	
-// } __attribute__((packed));
 #include <net/if_arp.h>
 #include <arpa/inet.h>
 #include <netinet/if_ether.h>
@@ -12,7 +8,7 @@
 
 void arp(u_char *packetData, int packetLength)
 {
-	
+
 	struct arphdr *header = (struct arphdr *) packetData;
 	u_char *senderMAC, *targetMAC;
 	in_addr_t *senderIP, *targetIP;
@@ -49,10 +45,18 @@ void arp(u_char *packetData, int packetLength)
 
 	senderMAC = (u_char *)header+sizeof(struct arphdr);
 	printf("\t\tSender MAC: %s\n", ether_ntoa((struct ether_addr *)senderMAC));
-	
-	senderIP = (in_addr_t *)senderMAC + header->ar_hln;
+
+	senderIP = (in_addr_t *)(senderMAC + header->ar_hln);
 	netAddr.s_addr = (in_addr_t)*senderIP;
 	printf("\t\tSender IP: %s\n", inet_ntoa(netAddr));
+
+
+	targetMAC = (u_char *)senderIP+header->ar_pln;
+	printf("\t\tTarget MAC: %s\n", ether_ntoa((struct ether_addr *)targetMAC));
+
+	targetIP = (in_addr_t *)(targetMAC + header->ar_hln);
+	netAddr.s_addr = (in_addr_t)*targetIP;
+	printf("\t\tTarget IP: %s\n", inet_ntoa(netAddr));
 
 
 }

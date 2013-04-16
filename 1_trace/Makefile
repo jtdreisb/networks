@@ -15,6 +15,7 @@ LDFLAGS=-lpcap
 SRC=$(wildcard *.c)
 HEADERS=$(wildcard *.h)
 OBJECTS=$(patsubst %.c, %.o, $(SRC))
+TESTFILES=$(patsubst %.out.txt, %, $(wildcard files/*.out.txt))
 
 
 ifeq ("$(OS)", "SunOS")
@@ -35,11 +36,17 @@ endif
 
 all: $(TARGET)
 
-clean:	
+clean:
 	rm -f $(OBJECTS) *~
 
 %.o : %.c
 	$(CC) $(CFLAGS) -c -o $@ $^
 
 $(TARGET): $(OBJECTS) $(HEADERS)
-	$(CC) $(LDFLAGS) -o $(TARGET) $(OBJECTS) 
+	$(CC) $(LDFLAGS) -o $(TARGET) $(OBJECTS)
+
+test: $(TARGET)
+	@for testfile in $(TESTFILES); do\
+		echo $$testfile ;\
+	done
+
