@@ -81,7 +81,6 @@ void ip(uint8_t *packetData, int packetLength)
 	printf("\t\tDest IP: %s\n", inet_ntoa(netAddr));
 
 	// printf("%x, %x\n", checksum, header->ip_header_checksum);
-
 	nextFrame = packetData + sizeof(struct IPFrameHeader);
 	nextFrameLen = packetLength - sizeof(struct IPFrameHeader);
 	switch (header->ip_protocol) {
@@ -94,10 +93,5 @@ void ip(uint8_t *packetData, int packetLength)
 		case IP_PROTO_UDP:
 			protocolName = "UDP";
 		break;
-		default:
-			protocolName = "Unknown";
-		break;
 	}
-
-
 }
