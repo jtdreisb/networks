@@ -2,6 +2,7 @@
 // trace
 
 #include <arpa/inet.h>
+#include <netinet/ether.h>
 #include <netinet/if_ether.h>
 #include "trace.h"
 
