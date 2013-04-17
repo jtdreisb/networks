@@ -1,7 +1,7 @@
 // main
 // trace
 
-#include <pcap/pcap.h>
+#include <pcap.h>
 #include "trace.h"
 
 void usage()

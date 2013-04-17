@@ -4,8 +4,11 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <stdint.h>
-#include <netinet/ether.h>
+#ifdef __APPLE__
 #include <netinet/if_ether.h>
+#else
+#include <netinet/ether.h>
+#endif
 #include <arpa/inet.h>
 
 typedef enum {
