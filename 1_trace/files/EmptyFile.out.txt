@@ -1,0 +1,1 @@
+ERROR: truncated dump file; tried to read 4 file header bytes, only got 0

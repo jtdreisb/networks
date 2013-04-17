@@ -24,6 +24,7 @@ TESTFILES=\
 	largeMix\
 	largeMix2\
 	TCP_bad_checksum\
+	EmptyFile\
 
 #$(patsubst %.out.txt, %, $(wildcard files/*.out.txt))
 
