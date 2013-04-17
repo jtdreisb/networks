@@ -46,15 +46,9 @@ void ethernet(uint8_t *packetData, int packetLength)
 		ip(nextFrame, nextFrameLength);
 		// type = "IP"; // v4
 	}
-	else if (header->etherType == 0x86DD) {
-		printf("IP\n\n");
-		// type = "IP"; // v6
-	}
 	else {
 		printf("Unknown\n\n");
 		// type = "Unknown";
 	}
-
-
 
 }

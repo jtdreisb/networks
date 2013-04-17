@@ -1,10 +1,16 @@
 // arp
 // trace
 
-#include <net/if_arp.h>
 #include <arpa/inet.h>
 #include <netinet/if_ether.h>
 #include "trace.h"
+
+#define	ARPOP_REQUEST	1	/* request to resolve address */
+#define	ARPOP_REPLY	2	/* response to previous request */
+#define	ARPOP_REVREQUEST 3	/* request protocol address given hardware */
+#define	ARPOP_REVREPLY	4	/* response giving protocol address */
+#define ARPOP_INVREQUEST 8 	/* request to identify peer */
+#define ARPOP_INVREPLY	9	/* response identifying peer */
 
 void arp(uint8_t *packetData, int packetLength)
 {
