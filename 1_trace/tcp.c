@@ -3,44 +3,34 @@
 
 #include "trace.h"
 #include "checksum.h"
+#include <string.h>
+#include <stdlib.h>
 
-
-typedef enum {
-	TCP_FIN = 1 << 0,
-	TCP_SYN = 1 << 1,
-	TCP_RST = 1 << 2,
-	TCP_PSH = 1 << 3,
-	TCP_ACK = 1 << 4,
-	TCP_URG = 1 << 5,
-	TCP_ECE = 1 << 6,
-	TCP_CWR = 1 << 7
-} TCPFlags;
-
-struct TCPFrameHeader
+uint16_t tcp_checksum(struct TCPFrameHeader *tcp_header, struct IPFrameHeader *ip_header)
 {
-	uint16_t tcp_source_port;
-	uint16_t tcp_destination_port;
-	uint32_t tcp_sequence_number;
-	uint32_t tcp_acknowledgement_number;
-	uint8_t tcp_data_offset;
-	uint8_t tcp_flags;
-	uint16_t tcp_window_size;
-	uint16_t tcp_checksum;
-	uint16_t tcp_urgent_pointer;
-} __attribute__((packed));
+	uint8_t ipHeaderSize = ((ip_header->ip_version_and_header_length & 0x0F) * 4);
+	uint16_t ipHeaderTotalLength = ntohs(ip_header->ip_total_length);
+	uint16_t tcpFullHeaderLength = sizeof(struct TCPPsuedoHeader) + ipHeaderTotalLength - ipHeaderSize;
+	uint16_t tcpLength = ipHeaderTotalLength - ipHeaderSize;
 
+	struct TCPPsuedoHeader *psuedoHeader = malloc(tcpFullHeaderLength);
 
-// psuedoheader
-// ===========
-// source
-// destination
-// 0 6 length
-// TCP header
-// data
+	psuedoHeader->tcp_source_address = ip_header->ip_source_address;
+	psuedoHeader->tcp_destination_address = ip_header->ip_destination_address;
+	psuedoHeader->tcp_zeroes = 0;
+	psuedoHeader->tcp_protocol = IP_PROTO_TCP;
+	psuedoHeader->tcp_length = htons(tcpLength);
 
-void tcp(uint8_t *packetData, int packetLength)
+	memcpy(((char *)psuedoHeader)+sizeof(struct TCPPsuedoHeader), tcp_header, tcpLength);
+	uint16_t checksum = in_cksum((uint16_t *)psuedoHeader, tcpFullHeaderLength);
+	free((void *)psuedoHeader);
+	return checksum;
+}
+
+void tcp(uint8_t *packetData, int packetLength, struct IPFrameHeader *ipHeader)
 {
 	struct TCPFrameHeader *header = (struct TCPFrameHeader *)packetData;
+
 	printf("\n\tTCP Header\n");
 
 	printf("\t\tSource Port:  ");
@@ -97,6 +87,18 @@ void tcp(uint8_t *packetData, int packetLength)
 
 	printf("\t\tWindow Size: %u\n", ntohs(header->tcp_window_size));
 
-	// TODO: calculate checksum
-	printf("\t\tChecksum: (0x%x)", ntohs(header->tcp_checksum));
+
+	printf("\t\tChecksum: ");
+
+
+	if(tcp_checksum(header, ipHeader)) {
+		printf("Incorrect");
+	}
+	else {
+		printf("Correct");
+	}
+
+	printf(" (0x%x)", ntohs(header->tcp_checksum));
+	// free(psuedoHeader);
+
 }

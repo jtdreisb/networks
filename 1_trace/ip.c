@@ -6,29 +6,6 @@
 #include "trace.h"
 #include "checksum.h"
 
-#define IPv4_ADDR_LENGTH 4
-
-typedef enum {
-	IP_PROTO_ICMP = 0x01,
-	IP_PROTO_TCP = 0x06,
-	IP_PROTO_UDP = 0x11
-} IPProtocol;
-
-struct IPFrameHeader
-{
-	uint8_t ip_version_and_header_length;
-	uint8_t ip_dscp_and_ecn;
-	uint16_t ip_total_length;
-	uint16_t ip_identifier;
-	uint16_t ip_flags_and_fragment_offset;
-	uint8_t ip_time_to_live;
-	uint8_t ip_protocol;
-	uint16_t ip_header_checksum;
-	in_addr_t ip_source_address;
-	in_addr_t ip_destination_address;
-
-} __attribute__((packed));
-
 void ip(uint8_t *packetData, int packetLength)
 {
 	char *protocolName;
@@ -63,12 +40,13 @@ void ip(uint8_t *packetData, int packetLength)
 
 	printf("\t\tChecksum: ");
 
-	checksum = in_cksum((uint16_t *)packetData, 10);
+	checksum = in_cksum((uint16_t *)packetData, sizeof(struct IPFrameHeader));
 	// unsigned short in_cksum(unsigned short *addr,int len);
 	header->ip_header_checksum = ntohs(header->ip_header_checksum);
 	if (checksum == 0) {
 		printf("Correct");
-	} else {
+	}
+	else {
 		printf("Incorrect");
 	}
 
@@ -81,14 +59,14 @@ void ip(uint8_t *packetData, int packetLength)
 	printf("\t\tDest IP: %s\n", inet_ntoa(netAddr));
 
 	// printf("%x, %x\n", checksum, header->ip_header_checksum);
-	nextFrame = packetData + sizeof(struct IPFrameHeader);
-	nextFrameLength = packetLength - sizeof(struct IPFrameHeader);
+	nextFrame = packetData + ((header->ip_version_and_header_length & 0x0F) * 4);
+	nextFrameLength = packetLength - ((header->ip_version_and_header_length & 0x0F) * 4);
 	switch (header->ip_protocol) {
 		case IP_PROTO_ICMP:
 			icmp(nextFrame, nextFrameLength);
 		break;
 		case IP_PROTO_TCP:
-			tcp(nextFrame, nextFrameLength);
+			tcp(nextFrame, nextFrameLength, header);
 		break;
 		case IP_PROTO_UDP:
 			udp(nextFrame, nextFrameLength);

@@ -21,14 +21,9 @@ TESTFILES=\
 	PingTest\
 	smallTCP\
 	UDPfile\
-
-	# largeMix\
-	# largeMix2\
-
-
-	# TCP_bad_checksum\
-
-
+	largeMix\
+	largeMix2\
+	TCP_bad_checksum\
 
 #$(patsubst %.out.txt, %, $(wildcard files/*.out.txt))
 

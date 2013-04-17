@@ -15,24 +15,6 @@ typedef enum {
 	UDP_CWR = 1 << 7
 } UDPFlags;
 
-struct UDPFrameHeader
-{
-	uint16_t udp_source_port;
-	uint16_t udp_destination_port;
-	uint16_t udp_length;
-	uint16_t udp_checksum;
-
-} __attribute__((packed));
-
-
-// psuedoheader
-// ===========
-// source
-// destination
-// 0 6 length
-// TCP header
-// data
-
 void udp(uint8_t *packetData, int packetLength)
 {
 	struct UDPFrameHeader *header = (struct UDPFrameHeader *)packetData;

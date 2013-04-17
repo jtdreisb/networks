@@ -5,13 +5,6 @@
 #include <netinet/if_ether.h>
 #include "trace.h"
 
-struct EthernetFrameHeader
-{
-	uint8_t destinationMAC[6];
-	uint8_t sourceMAC[6];
-	uint16_t etherType;
-} __attribute__((packed));
-
 
 #define kEthernetFrameTrailerOffset 16
 

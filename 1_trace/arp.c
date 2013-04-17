@@ -6,15 +6,6 @@
 #include <netinet/if_ether.h>
 #include "trace.h"
 
-struct ARPFrameHeader
-{
-	uint16_t	arp_hardware_format;
-	uint16_t	arp_protocol_format;
-	uint8_t	arp_hardware_length;
-	uint8_t	arp_protocol_length;
-	uint16_t	arp_opcode;
-} __attribute__((packed));
-
 void arp(uint8_t *packetData, int packetLength)
 {
 
