@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <stdint.h>
+#include <netinet/ether.h>
+#include <netinet/if_ether.h>
+#include <arpa/inet.h>
 
 typedef enum {
 	PORT_HTTP = 80,

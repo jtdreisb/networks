@@ -1,8 +1,6 @@
 // ethernet functions
 // trace
 
-#include <netinet/ether.h>
-#include <netinet/if_ether.h>
 #include "trace.h"
 
 
