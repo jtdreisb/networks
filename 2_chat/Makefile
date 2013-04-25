@@ -14,7 +14,7 @@ SRCS = $(shell ls *.cpp *.c 2> /dev/null)
 OBJS = $(shell ls *.cpp *.c 2> /dev/null | sed s/\.c[p]*$$/\.o/ )
 LIBNAME = $(shell ls *cpe464*.a)
 
-ALL = rcopy server
+ALL = cclient server
 
 all: $(OBJS) $(ALL)
 
@@ -35,7 +35,7 @@ echo:
 	@echo "*** Building $@"
 	$(CC) -c $(CFLAGS) $< -o $@ $(LIBS)
 
-rcopy: rcopy.c util.c
+cclient: cclient.c util.c
 	@echo "-------------------------------"
 	@echo "*** Linking $@ with library $(LIBNAME)... "
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBNAME) $(LIBS)
@@ -57,7 +57,7 @@ test: test.c
 	@echo "-------------------------------"
 
 # clean targets for Solaris and Linux
-clean: 
+clean:
 	@echo "-------------------------------"
 	@echo "*** Cleaning Files..."
 	rm -f *.o $(ALL)
