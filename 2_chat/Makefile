@@ -1,65 +1,64 @@
-# Chat
-# Networks Program 2
+# Makefile for CPE464 library
 
-PROGRAM=trace
-
+CC = gcc
+CFLAGS = -g -Wall -Werror
 
 OS = $(shell uname -s)
-PROC = $(shell uname -p)
-TARGET=$(PROGRAM)
-#-$(OS)-$(PROC)
-
-CC=gcc
-CFLAGS=-Wall -g
-LDFLAGS=-lpcap
-SRC=$(wildcard *.c)
-HEADERS=$(wildcard *.h)
-OBJECTS=$(patsubst %.c, %.o, $(SRC))
-TESTFILES=\
-	ArpTest\
-	IP_bad_checksum\
-	PingTest\
-	smallTCP\
-	UDPfile\
-	largeMix\
-	largeMix2\
-	TCP_bad_checksum\
-	EmptyFile\
-
-#$(patsubst %.out.txt, %, $(wildcard files/*.out.txt))
-
-
 ifeq ("$(OS)", "SunOS")
-	OSLIB=-L/opt/csw/lib -lsocket -lnsl
-	OSINC=-I/opt/csw/include
-	OSDEF=-DSOLARIS
-else
-ifeq ("$(OS)", "Darwin")
-	OSLIB=
-	OSINC=
-	OSDEF=-DDARWIN
-else
-	OSLIB=
-	OSINC=
-	OSDEF=-DLINUX
-endif
+	LIBS += -lsocket -lnsl
 endif
 
-all: $(TARGET)
+LIBS += -lstdc++
 
-clean:
-	rm -f $(OBJECTS) *~
+SRCS = $(shell ls *.cpp *.c 2> /dev/null)
+OBJS = $(shell ls *.cpp *.c 2> /dev/null | sed s/\.c[p]*$$/\.o/ )
+LIBNAME = $(shell ls *cpe464*.a)
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+ALL = rcopy server
 
-$(TARGET): $(OBJECTS) $(HEADERS)
-	$(CC) $(LDFLAGS) -o $(TARGET) $(OBJECTS)
+all: $(OBJS) $(ALL)
 
-test: $(TARGET)
-	@for testfile in $(TESTFILES); do\
-		./trace files/$$testfile.pcap > files/$$testfile.my.out; \
-		diff -B -U 10 files/$$testfile.my.out files/$$testfile.out.txt ;\
-	done
+lib:
+	make -f lib.mk
 
+echo:
+	@echo "Objects: $(OBJS)"
+	@echo "LIBNAME: $(LIBNAME)"
 
+.cpp.o:
+	@echo "-------------------------------"
+	@echo "*** Building $@"
+	$(CC) -c $(CFLAGS) $< -o $@ $(LIBS)
+
+.c.o:
+	@echo "-------------------------------"
+	@echo "*** Building $@"
+	$(CC) -c $(CFLAGS) $< -o $@ $(LIBS)
+
+rcopy: rcopy.c util.c
+	@echo "-------------------------------"
+	@echo "*** Linking $@ with library $(LIBNAME)... "
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBNAME) $(LIBS)
+	@echo "*** Linking Complete!"
+	@echo "-------------------------------"
+
+server: server.c util.c
+	@echo "-------------------------------"
+	@echo "*** Linking $@ with library $(LIBNAME)... "
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBNAME) $(LIBS)
+	@echo "*** Linking Complete!"
+	@echo "-------------------------------"
+
+test: test.c
+	@echo "-------------------------------"
+	@echo "*** Linking $@ with library $(LIBNAME)... "
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBNAME)
+	@echo "*** Linking Complete!"
+	@echo "-------------------------------"
+
+# clean targets for Solaris and Linux
+clean: 
+	@echo "-------------------------------"
+	@echo "*** Cleaning Files..."
+	rm -f *.o $(ALL)
+	@echo "-------------------------------"

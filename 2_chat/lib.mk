@@ -47,7 +47,7 @@ get_464lib:
 	@curl $(CPE464_PATH)/$(CPE464_TAR) > ./$(CPE464_TAR)
 	@tar -xf $(CPE464_TAR)
 	@rm -f $(CPE464_TAR)
-	-@mv -f -t ./ $(LIBPATH)/userfiles/*
+	-@mv -f $(LIBPATH)/userfiles/* ./
 	@if [ ! -f Makefile ]; then mv -f example.mk Makefile; fi
 
 build_464lib:
