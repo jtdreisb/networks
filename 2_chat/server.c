@@ -6,12 +6,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 
 #define MAX_PENDING_CLIENTS 1024
+#define MAX_PACKET_SIZE 1256
+#define DEFAULT_MAX_SOCKET 3
 
 struct ClientNode {
 	int clientSocket;
-	char *name;
+	char *clientName;
 	struct ClientNode *nextClient;
 };
 
@@ -26,9 +29,38 @@ struct ClientList *clientList = &_clientList;
 
 struct ClientNode *clientNamed(char *name)
 {
-	// TODO: parse clientList and return the node matching "name"
-	return NULL;
+	struct ClientNode *node = clientList->firstClient;
+	while (node != NULL) {
+		if (strcmp(name, node->clientName) == 0) {
+			break;
+		}
+	}
+	return node;
 }
+
+void printClient(struct ClientNode *node)
+{
+	printf("Node:\n"
+		"\tName: %s\n"
+		"\tSocket: %d\n",
+		node->clientName,
+		node->clientSocket);
+}
+
+void printClientList()
+{
+	printf("ClientList:\n================\n");
+	int clientCount = 0;
+	struct ClientNode *client = clientList->firstClient;
+	while (client != NULL) {
+		printf("%d ", ++clientCount);
+		printClient(client);
+		client = client->nextClient;
+	}
+	printf("%d active Clients\n", clientCount);
+	printf("Max Socket: %d\n", clientList->maxSocket);
+}
+
 
 void acceptNewClient(int serverSocket)
 {
@@ -42,7 +74,7 @@ void acceptNewClient(int serverSocket)
 
 	memset(newClient, 0, sizeof(struct ClientNode));
 
-	if ((newClient->clientSocket = accept(serverSocket, (struct sockaddr *) &newClientAddress, &clntLen)) < 0) {
+	if ((newClient->clientSocket = accept(serverSocket, (struct sockaddr *) &newClientAddress, &sockLength)) < 0) {
 		perror("acceptNewClient:accept");
 		free(newClient);
 		return;
@@ -61,9 +93,86 @@ void acceptNewClient(int serverSocket)
 	}
 }
 
+void removeClient(struct ClientNode *client)
+{
+	struct ClientNode *node = clientList->firstClient;
+	if (node == client) {
+		clientList->firstClient = NULL;
+		node = NULL;
+	}
+	else {
+		while (node != NULL) {
+			if (node->nextClient == client) {
+				node->nextClient = client->nextClient;
+				break;
+			}
+			node = node->nextClient;
+		}
+	}
+	if (clientList->lastClient == client) {
+		clientList->lastClient = node;
+	}
+	if (client->clientSocket == clientList->maxSocket) {
+		if (clientList->firstClient == NULL) {
+			clientList->maxSocket = DEFAULT_MAX_SOCKET;
+		}
+	}
+	close(client->clientSocket);
+	if (client->clientName != NULL)
+		free(client->clientName);
+	free(client);
+}
+
 void handleClient(struct ClientNode *client)
 {
-	printf("handleClient\n" );
+	ssize_t bytesRcvd;
+	char *buf = malloc(MAX_PACKET_SIZE);
+	if (buf == NULL) {
+		perror("handleClient:malloc");
+		return;
+	}
+
+	if ((bytesRcvd = recv(client->clientSocket, buf, MAX_PACKET_SIZE-1, 0)) < 0) {
+		perror("handleClient:recv");
+		free(buf);
+		return;
+	}
+	// Check for a shutdown
+	if (bytesRcvd == 0) {
+		removeClient(client);
+	}
+	// Parse the buffer
+	else {
+		// TODO:parse buffer
+		printf("recvd: %s\n", buf);
+
+		if (send(client->clientSocket, buf, bytesRcvd, 0) != bytesRcvd) {
+			perror("handleClient:send");
+			exit(1);
+		}
+	}
+	free(buf);
+}
+
+void setActiveClientsForSelect(fd_set *fdSet)
+{
+	struct ClientNode *activeClient;
+	activeClient = clientList->firstClient;
+	while(activeClient != NULL) {
+		FD_SET(activeClient->clientSocket, fdSet);
+		activeClient = activeClient->nextClient;
+	}
+}
+
+void checkActiveClientsAfterSelect(fd_set *fdSet)
+{
+	struct ClientNode *activeClient = clientList->firstClient;
+	while(activeClient != NULL) {
+		if(FD_ISSET(activeClient->clientSocket, fdSet)) {
+			handleClient(activeClient);
+		}
+		activeClient = activeClient->nextClient;
+	}
 }
 
 int startServer(in_port_t *portNumber)
@@ -91,6 +200,11 @@ int startServer(in_port_t *portNumber)
 		return -3;
 	}
 
+	if (listen(serverSocket, MAX_PENDING_CLIENTS) < 0) {
+		perror("startServer:listen");
+		return -4;
+	}
+
 	*portNumber = local.sin_port;
 	return serverSocket;
 }
@@ -105,17 +219,11 @@ int main(int argc, char const *argv[])
 		exit(serverSocket);
 	}
 
-	clientList->maxSocket = serverSocket;
+	clientList->maxSocket = DEFAULT_MAX_SOCKET;
 
 	printf("Server is using port %d\n", ntohs(serverPort));
 
-	if (listen(serverSocket, MAX_PENDING_CLIENTS) < 0) {
-		perror("main:listen");
-		exit (-4);
-	}
-
 	for(;;) {
-		struct ClientNode *activeClient;
 		fd_set fdSet;
 		static struct timeval timeout;
 		timeout.tv_sec = 1;
@@ -124,11 +232,7 @@ int main(int argc, char const *argv[])
 
 		FD_SET(serverSocket, &fdSet);
 
-		activeClient = clientList->firstClient;
-		while(activeClient != NULL) {
-			FD_SET(activeClient->clientSocket, &fdSet);
-			activeClient = activeClient->nextClient;
-		}
+		setActiveClientsForSelect(&fdSet);
 
 		if (select(clientList->maxSocket+1, &fdSet, NULL, NULL, &timeout) < 0){
 			perror("main:select");
@@ -138,18 +242,10 @@ int main(int argc, char const *argv[])
 			if (FD_ISSET(serverSocket, &fdSet)) {
 				acceptNewClient(serverSocket);
 			}
-
-			activeClient = clientList->firstClient;
-			while(activeClient != NULL) {
-				if(FD_ISSET(activeClient->clientSocket, &fdSet)) {
-					handleClient(activeClient);
-				}
-				activeClient = activeClient->nextClient;
-			}
+			checkActiveClientsAfterSelect(&fdSet);
 		}
 	}
 
 	close(serverSocket);
-
 	return 0;
 }

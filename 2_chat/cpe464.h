@@ -13,6 +13,8 @@
 extern "C" {
 #endif
 
+#include "util.h"
+
 unsigned short in_cksum(unsigned short *addr, int len);
 
 #ifdef __cplusplus
