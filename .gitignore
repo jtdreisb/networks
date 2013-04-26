@@ -21,7 +21,7 @@
 .AppleDouble
 .LSOverride
 Icon
-.dSYM
+*.dSYM
 
 
 # Thumbnails
