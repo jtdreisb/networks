@@ -2,16 +2,11 @@
 // CPE464 Program 2
 // Jason Dreisbach
 #include "cpe464.h"
-#include <netinet/in.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
+
 
 #define MAX_PENDING_CLIENTS 1024
 #define MAX_PACKET_SIZE 1256
 #define DEFAULT_MAX_SOCKET 3
-
 struct ClientNode {
 	int clientSocket;
 	char *clientName;
@@ -26,6 +21,11 @@ struct ClientList {
 
 struct ClientList _clientList;
 struct ClientList *clientList = &_clientList;
+
+
+//************************************************************************************
+//** Client List Utility Functions
+//************************************************************************************
 
 struct ClientNode *clientNamed(char *name)
 {
@@ -61,7 +61,9 @@ void printClientList()
 	printf("Max Socket: %d\n", clientList->maxSocket);
 }
 
-
+//************************************************************************************
+//** Client Addition and Removal
+//************************************************************************************
 void acceptNewClient(int serverSocket)
 {
 	struct sockaddr_in newClientAddress;
@@ -123,10 +125,20 @@ void removeClient(struct ClientNode *client)
 	free(client);
 }
 
+//************************************************************************************
+//** Request Handling
+//************************************************************************************
+
+
+
+void registerHandle(struct ClientNode *client, uint8_t *buf, ssize_t bufLen);
+void forwardMessage(struct ClientNode *client, uint8_t *buf, ssize_t bufLen);
+void respondToClient(struct ClientNode *client, HeaderFlag flag, uint8_t *data, ssize_t dataLen);
+
 void handleClient(struct ClientNode *client)
 {
 	ssize_t bytesRcvd;
-	char *buf = malloc(MAX_PACKET_SIZE);
+	uint8_t *buf = malloc(MAX_PACKET_SIZE);
 	if (buf == NULL) {
 		perror("handleClient:malloc");
 		return;
@@ -143,17 +155,86 @@ void handleClient(struct ClientNode *client)
 	}
 	// Parse the buffer
 	else {
-		// TODO:parse buffer
-		printf("recvd: %s\n", buf);
+		struct ChatHeader *header = (struct ChatHeader *)buf;
+		switch (header->flag) {
+			case FLAG_INIT_REQ:
+				registerHandle(client, buf, bytesRcvd);
+				break;
+			case FLAG_MSG_REQ:
 
-		if (send(client->clientSocket, buf, bytesRcvd, 0) != bytesRcvd) {
-			perror("handleClient:send");
-			exit(1);
+			//forward
+				break;
+			case FLAG_MSG_ACK:
+			// forward
+				break;
+			case FLAG_EXIT_REQ:
+			// intercept
+				break;
+			case FLAG_LIST_REQ:
+				break;
+			case FLAG_HNDL_REQ:
+				break;
+			case FLAG_INIT_ACK:
+			case FLAG_INIT_ERR:
+			case FLAG_MSG_ERR:
+			case FLAG_EXIT_ACK:
+			case FLAG_LIST_RESP:
+			case FLAG_HNDL_RESP:
+			default:
+				break;
 		}
 	}
 	free(buf);
 }
 
+void registerHandle(struct ClientNode *client, uint8_t *buf, ssize_t bufLen)
+{
+	char *clientHandle;
+	uint8_t handleLen = *(buf + kChatHeaderSize);
+	if (bufLen < (kChatHeaderSize + handleLen)) {
+		respondToClient(client, FLAG_INIT_ERR, NULL, 0);
+		removeClient(client);
+		return;
+	}
+
+	clientHandle = malloc(handleLen+1);
+	if (clientHandle == NULL) {
+		perror("registerHandle:malloc");
+		exit(1);
+	}
+
+	memcpy(clientHandle, buf + kChatHeaderSize + 1, handleLen);
+	clientHandle[handleLen] = '\0';
+
+	if (clientNamed(clientHandle) != client) {
+		respondToClient(client, FLAG_INIT_ERR, NULL, 0);
+		removeClient(client);
+		return;
+	}
+
+	client->clientName = clientHandle;
+	respondToClient(client, FLAG_INIT_ACK, NULL, 0);
+}
+
+void forwardMessage(struct ClientNode *client, uint8_t *buf, ssize_t bufLen)
+{
+
+}
+
+void respondToClient(struct ClientNode *client, HeaderFlag flag, uint8_t *data, ssize_t dataLen)
+{
+	uint8_t *packet = makePacket(flag, data, dataLen);
+	ssize_t packetLen = kChatHeaderSize + dataLen;
+	ssize_t bytesSent;
+	if ((bytesSent = send(client->clientSocket, packet, packetLen, 0)) < 0) {
+		perror("respondToClient:send");
+	}
+	free(packet);
+}
+
+//************************************************************************************
+//** Select() Utility Functions
+//************************************************************************************
 void setActiveClientsForSelect(fd_set *fdSet)
 {
 	struct ClientNode *activeClient;
@@ -175,6 +256,9 @@ void checkActiveClientsAfterSelect(fd_set *fdSet)
 	}
 }
 
+//************************************************************************************
+//** Server Setup
+//************************************************************************************
 int startServer(in_port_t *portNumber)
 {
 	int serverSocket;

@@ -9,12 +9,42 @@
  * a 16-bit, unsigned short
  */
 
+#include <netinet/in.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+
+typedef enum {
+    FLAG_INIT_REQ = 1,
+    FLAG_INIT_ACK = 2,
+    FLAG_INIT_ERR = 3,
+    FLAG_MSG_REQ  = 6,
+    FLAG_MSG_ERR  = 7,
+    FLAG_MSG_ACK = 255,
+    FLAG_EXIT_REQ = 8,
+    FLAG_EXIT_ACK = 9,
+    FLAG_LIST_REQ = 10,
+    FLAG_LIST_RESP = 11,
+    FLAG_HNDL_REQ = 12,
+    FLAG_HNDL_RESP = 13
+} HeaderFlag;
+
+
+struct ChatHeader {
+    uint32_t sequenceNumber;
+    uint16_t checksum;
+    uint8_t flag;
+};
+
+#define kChatHeaderSize sizeof(struct ChatHeader)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "util.h"
-
+uint8_t *makePacket(HeaderFlag flag, uint8_t *data, ssize_t dataLen);
 unsigned short in_cksum(unsigned short *addr, int len);
 
 #ifdef __cplusplus
