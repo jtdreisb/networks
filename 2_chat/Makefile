@@ -52,7 +52,8 @@ server: server.c util.c
 test: test.c
 	@echo "-------------------------------"
 	@echo "*** Linking $@ with library $(LIBNAME)... "
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBNAME)
+	$(CC) $(CFLAGS) -o $@ $^
+	#$(LIBNAME)
 	@echo "*** Linking Complete!"
 	@echo "-------------------------------"
 

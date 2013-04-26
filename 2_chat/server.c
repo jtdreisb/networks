@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #define MAX_PENDING_CLIENTS 1024
 
@@ -31,13 +32,38 @@ struct ClientNode *clientNamed(char *name)
 
 void acceptNewClient(int serverSocket)
 {
-	// struct sockaddr_in echoClntAddr; /* Client address */
-// if ((clntSock = accept(servSock, (struct sockaddr *) &echoClntAddr,
-                               // &clntLen)) < 0)
+	struct sockaddr_in newClientAddress;
+	socklen_t sockLength = sizeof(newClientAddress);
+	struct ClientNode *newClient = malloc(sizeof(struct ClientNode));
+	if (newClient == NULL) {
+		perror("acceptNewClient:malloc");
+		exit(-6);
+	}
+
+	memset(newClient, 0, sizeof(struct ClientNode));
+
+	if ((newClient->clientSocket = accept(serverSocket, (struct sockaddr *) &newClientAddress, &clntLen)) < 0) {
+		perror("acceptNewClient:accept");
+		free(newClient);
+		return;
+	}
+
+	if ((clientList->firstClient == NULL) || (clientList->lastClient == NULL)) {
+		clientList->firstClient = newClient;
+		clientList->lastClient = newClient;
+	}
+	else {
+		clientList->lastClient->nextClient = newClient;
+		clientList->lastClient = newClient;
+	}
+	if (clientList->maxSocket < newClient->clientSocket) {
+		clientList->maxSocket = newClient->clientSocket;
+	}
 }
 
-void handleClient(struct ClientNode *client) {
-
+void handleClient(struct ClientNode *client)
+{
+	printf("handleClient\n" );
 }
 
 int startServer(in_port_t *portNumber)
@@ -72,16 +98,16 @@ int startServer(in_port_t *portNumber)
 int main(int argc, char const *argv[])
 {
 	int serverSocket = -1;
-	in_port_t listenPort = 0;
+	in_port_t serverPort = 0;
 
-	serverSocket = startServer(&listenPort);
+	serverSocket = startServer(&serverPort);
 	if (serverSocket < 0) {
 		exit(serverSocket);
 	}
 
 	clientList->maxSocket = serverSocket;
 
-	printf("Server is using port %d\n", listenPort);
+	printf("Server is using port %d\n", ntohs(serverPort));
 
 	if (listen(serverSocket, MAX_PENDING_CLIENTS) < 0) {
 		perror("main:listen");
@@ -104,8 +130,9 @@ int main(int argc, char const *argv[])
 			activeClient = activeClient->nextClient;
 		}
 
-		if (select(clientList->maxSocket+1, &fdSet, NULL, NULL, &timeout ) == 0) {
-			// Timeout!
+		if (select(clientList->maxSocket+1, &fdSet, NULL, NULL, &timeout) < 0){
+			perror("main:select");
+			exit(-5);
 		}
 		else {
 			if (FD_ISSET(serverSocket, &fdSet)) {
@@ -121,6 +148,8 @@ int main(int argc, char const *argv[])
 			}
 		}
 	}
+
+	close(serverSocket);
 
 	return 0;
 }
