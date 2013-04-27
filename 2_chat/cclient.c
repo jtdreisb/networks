@@ -46,9 +46,7 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 	int selectStatus, i;
 	ssize_t numBytes;
 	fd_set fdSet;
-	static struct timeval timeout;
-	timeout.tv_sec = 1;
-	timeout.tv_usec = 0;
+
 	struct ChatHeader *sendHeader = (struct ChatHeader *)outPacket;
 
 	if (inPacket != NULL)
@@ -62,7 +60,9 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 			perror("sendWait:send");
 			return;
 		}
-
+		static struct timeval timeout;
+		timeout.tv_sec = 1;
+		timeout.tv_usec = 0;
 		// wait for a response
 		FD_ZERO(&fdSet);
 		FD_SET(gClient->socket, &fdSet);
@@ -160,7 +160,7 @@ void readPacketFromSocket(int sock)
 			sendMessageACK(recvBuf->sequenceNumber, fromHandle);
 			break;
 		default:
-			fprintf(stderr, "ERROR: Unknown packet type %d\n", recvBuf->flag);
+			fprintf(stderr, "ERROR:readPacketFromSocket Unknown packet type %d\n", recvBuf->flag);
 			break;
 	}
 
