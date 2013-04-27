@@ -137,6 +137,8 @@ uint8_t *makePacket(struct ChatHeader header, uint8_t *data, ssize_t dataLen);
 void registerHandle(struct ClientNode *client);
 void clientExit(struct ClientNode *client);
 void forwardMessage(struct ClientNode *client);
+void clientCount(struct ClientNode *client);
+void clientNameRequest(struct ClientNode *client);
 void respondToClient(struct ClientNode *client, HeaderFlag flag, uint8_t *data, ssize_t dataLen);
 
 void handleClient(struct ClientNode *client)
@@ -179,8 +181,10 @@ void handleClient(struct ClientNode *client)
 					clientExit(client);
 					break;
 				case FLAG_LIST_REQ:
+					clientCount(client);
 					break;
 				case FLAG_HNDL_REQ:
+					clientNameRequest(client);
 					break;
 				case FLAG_INIT_ACK:
 				case FLAG_INIT_ERR:
@@ -198,6 +202,42 @@ void handleClient(struct ClientNode *client)
 	free(buf);
 }
 
+void clientCount(struct ClientNode *client)
+{
+	uint32_t numClients;
+	struct ClientNode *index = clientList->firstClient;
+	for (numClients = 0; index != NULL; index = index->nextClient) {
+		if (index->clientName != NULL)
+			numClients++;
+	}
+	numClients = htonl(numClients);
+	respondToClient(client, FLAG_LIST_RESP, (uint8_t *)&numClients, sizeof(uint32_t));
+}
+
+void clientNameRequest(struct ClientNode *client)
+{
+	uint8_t *index = (uint8_t *)client->packetData;
+	index += kChatHeaderSize;
+	uint32_t clientIndex = *(uint32_t *)index;
+	clientIndex = ntohl(clientIndex);
+	struct ClientNode *node = clientList->firstClient;
+	int i;
+	for (i = 0;; node = node->nextClient) {
+		if (node && node->clientName != NULL) {
+			if (i == clientIndex) {
+				break;
+			}
+			i++;
+		}
+	}
+
+	uint8_t *payload = malloc(1 + strlen(node->clientName));
+	payload[0] = strlen(node->clientName);
+	memcpy(payload+1, node->clientName, strlen(node->clientName));
+
+	respondToClient(client, FLAG_HNDL_RESP, payload, 1 + strlen(node->clientName));
+	free(payload);
+}
 
 void registerHandle(struct ClientNode *client)
 {
@@ -268,7 +308,7 @@ void forwardMessage(struct ClientNode *client)
  	}
 
 	ssize_t bytesSent;
-	if ((bytesSent = send(destClient->clientSocket, client->packetData, client->packetLength, 0)) < 0) {
+	if ((bytesSent = sendErr(destClient->clientSocket, client->packetData, client->packetLength, 0)) < 0) {
 		perror("forwardMessage:send");
 	}
 }
@@ -282,7 +322,7 @@ void respondToClient(struct ClientNode *client, HeaderFlag flag, uint8_t *data, 
 	ssize_t packetLength = kChatHeaderSize + dataLen;
 
 	ssize_t bytesSent;
-	if ((bytesSent = send(client->clientSocket, packet, packetLength, 0)) < 0) {
+	if ((bytesSent = sendErr(client->clientSocket, packet, packetLength, 0)) < 0) {
 		perror("respondToClient:send");
 	}
 	free(packet);
@@ -375,10 +415,24 @@ int main(int argc, char const *argv[])
 	int serverSocket = -1;
 	in_port_t serverPort = 0;
 
+	if (argc != 2) {
+		fprintf(stderr, "Usage: %s <error>\n", argv[0]);
+		exit(1);
+	}
+
 	serverSocket = startServer(&serverPort);
 	if (serverSocket < 0) {
 		exit(serverSocket);
 	}
+
+	double errorRate;
+    sscanf(argv[1], "%lf", &errorRate);
+
+	sendErr_init(errorRate,
+		DROP_ON,
+		FLIP_ON,
+		DEBUG_ON,
+		RSEED_OFF);
 
 	clientList->maxSocket = DEFAULT_MAX_SOCKET;
 
@@ -386,16 +440,16 @@ int main(int argc, char const *argv[])
 
 	for(;;) {
 		fd_set fdSet;
-		static struct timeval timeout;
-		timeout.tv_sec = 1;
-		timeout.tv_usec = 0;
+		// static struct timeval timeout;
+		// timeout.tv_sec = 1;
+		// timeout.tv_usec = 0;
 		FD_ZERO(&fdSet);
 
 		FD_SET(serverSocket, &fdSet);
 
 		setActiveClientsForSelect(&fdSet);
 
-		if (select(clientList->maxSocket+1, &fdSet, NULL, NULL, &timeout) < 0){
+		if (select(clientList->maxSocket+1, &fdSet, NULL, NULL, NULL) < 0){
 			perror("main:select");
 			exit(-5);
 		}

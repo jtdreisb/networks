@@ -80,6 +80,9 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 					perror("sendWait:recv");
 					return;
 				}
+				// check for invalid checksum
+				if (in_cksum((uint16_t *)recvBuf, numBytes) != 0)
+					return;
 				uint32_t sequenceNumber;
 				switch(recvBuf->flag) {
 					case FLAG_MSG_ACK:
@@ -266,11 +269,79 @@ void doMessage(char *buffer)
 		fprintf(stderr, "ERROR: Message exceeds maximum allowed length\n");
 		return;
 	}
-
-
-
 	sendMessage(handle, message);
 }
+
+void printUser(uint32_t index)
+{
+	ssize_t outPacketLen = kChatHeaderSize + sizeof(uint32_t);
+	index = htonl(index);
+	uint8_t *outPacket = makePacket(FLAG_HNDL_REQ, (uint8_t *)&index, sizeof(uint32_t));
+	ssize_t responseLen;
+	struct ChatHeader *responseHeader;
+
+	sendWait(outPacket, outPacketLen, (uint8_t **)&responseHeader, &responseLen);
+
+	if (responseHeader != NULL) {
+		switch(responseHeader->flag) {
+			case FLAG_HNDL_RESP:
+				break;
+			default:
+				fprintf(stderr, "ERROR:printUser: Unexpected header flag (%d)\n", responseHeader->flag);
+				exit(1);
+				break;
+		}
+
+		char *packetData = (char *)responseHeader;
+		packetData += kChatHeaderSize;
+
+		char handle[MAX_HANDLE_LENGTH];
+		ssize_t handleLen = *packetData;
+
+		memcpy(handle, packetData+1, handleLen);
+		handle[handleLen] = '\0';
+
+		printf("%s\n", handle);
+
+		free(responseHeader);
+	}
+
+	free(outPacket);
+}
+
+void listUsers()
+{
+	ssize_t outPacketLen = kChatHeaderSize;
+	uint8_t *outPacket = makePacket(FLAG_LIST_REQ, NULL, 0);
+	ssize_t responseLen;
+	struct ChatHeader *responseHeader;
+
+	sendWait(outPacket, outPacketLen, (uint8_t **)&responseHeader, &responseLen);
+
+	if (responseHeader != NULL) {
+		switch(responseHeader->flag) {
+			case FLAG_LIST_RESP:
+				break;
+			default:
+				fprintf(stderr, "ERROR:listUsers: Unexpected header flag (%d)\n", responseHeader->flag);
+				exit(1);
+				break;
+		}
+		uint8_t *packetData = (uint8_t *)responseHeader;
+		uint32_t clientCount = *(uint32_t *)(packetData+kChatHeaderSize);
+		clientCount = ntohl(clientCount);
+
+		uint32_t i;
+		for (i = 0; i < clientCount; i++) {
+			printf("%d: ", i);
+			printUser(i);
+		}
+
+		free(responseHeader);
+	}
+	free(outPacket);
+}
+
 
 void handleUserInput()
 {
@@ -283,7 +354,7 @@ void handleUserInput()
 		doMessage(inputBuf+2);
 	}
 	else if (!strncmp(inputBuf, "\%L", 2) || !strncmp(inputBuf, "\%l", 2)) {
-		printf("Message\n");
+		listUsers();
 	}
 	else if (!strncmp(inputBuf, "\%E", 2) || !strncmp(inputBuf, "\%e", 2)) {
 		cleanupClient();
@@ -305,7 +376,7 @@ void mainEventLoop()
 			FD_SET(gClient->socket, &fdSet);
 			FD_SET(STDIN_FILENO, &fdSet);
 			if ((selectStatus = select(gClient->socket+1, &fdSet, NULL, NULL, NULL)) < 0) {
-				perror("sendWait:select");
+				perror("mainEventLoop:select");
 				exit(1);
 			}
 			else if (selectStatus > 0) {
@@ -423,6 +494,7 @@ int main(int argc, char *argv[])
        fprintf(stderr, "Usage: %s <handle> <error> <hostname> <port>\n", argv[0]);
        exit(-2);
     }
+
 
     // Save handle
     if (strlen(argv[1]) >  MAX_HANDLE_LENGTH) {
