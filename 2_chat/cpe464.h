@@ -38,13 +38,17 @@ struct ChatHeader {
     uint8_t flag;
 };
 
+#define MAX_HANDLE_LENGTH 255
+#define MAX_MESSAGE_LENGTH 1000
+#define MAX_PACKET_SIZE 2048
+
 #define kChatHeaderSize sizeof(struct ChatHeader)
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-uint8_t *makePacket(struct ChatHeader header, uint8_t *data, ssize_t dataLen);
 unsigned short in_cksum(unsigned short *addr, int len);
 
 #ifdef __cplusplus

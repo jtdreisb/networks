@@ -4,10 +4,9 @@
 #include "cpe464.h"
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <ctype.h>
 
-#define MAX_HANDLE_LENGTH 255
-#define MAX_MESSAGE_LENGTH 1000
-#define MAX_PACKET_SIZE 2048
+#define MAX_SEND_RETRIES 10
 
 struct ClientInfo {
 	int socket;
@@ -16,9 +15,35 @@ struct ClientInfo {
 };
 struct ClientInfo *gClient;
 
+void cleanupClient();
+
+uint8_t *makePacket(HeaderFlag flag, uint8_t *data, ssize_t dataLen)
+{
+	int packetLen = kChatHeaderSize + dataLen;
+	uint8_t *packet = malloc(packetLen);
+	if (packet == NULL) {
+		perror("makePacket:malloc");
+		exit(1);
+	}
+
+	struct ChatHeader *packetHeader = (struct ChatHeader *)packet;
+	packetHeader->sequenceNumber = gClient->sequenceNumber++;
+	packetHeader->flag = flag;
+	packetHeader->checksum = 0;
+
+	memcpy(packet + kChatHeaderSize, data, dataLen);
+
+	// Put header fields into network order
+	packetHeader->sequenceNumber = htonl(packetHeader->sequenceNumber);
+	// Calculate the checksum and stuff it into the right part
+	packetHeader->checksum = in_cksum((uint16_t *)packet, packetLen);
+
+	return packet;
+}
+
 void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssize_t *inPacketLen)
 {
-	int selectStatus;
+	int selectStatus, i;
 	ssize_t numBytes;
 	fd_set fdSet;
 	static struct timeval timeout;
@@ -26,7 +51,12 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 	timeout.tv_usec = 0;
 	struct ChatHeader *sendHeader = (struct ChatHeader *)outPacket;
 
-	for (;;) {
+	if (inPacket != NULL)
+		*inPacket = NULL;
+	if (inPacketLen != NULL)
+		*inPacketLen = 0;
+
+	for (i = 0; i < MAX_SEND_RETRIES ; i++) {
 		// send packet
 		if((numBytes = send(gClient->socket, outPacket, outPacketLen, 0)) < 0) {
 			perror("sendWait:send");
@@ -47,13 +77,20 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 				struct ChatHeader *recvBuf = malloc(MAX_PACKET_SIZE);
 				ssize_t numBytes;
 				if ((numBytes = recv(gClient->socket, (uint8_t *)recvBuf, MAX_PACKET_SIZE, 0)) < 0) {
-					perror("registerHandle:recv");
+					perror("sendWait:recv");
 					return;
 				}
-
-				if (recvBuf->sequenceNumber == sendHeader->sequenceNumber) {
-					gClient->sequenceNumber++;
-					if (*inPacket != NULL) {
+				uint32_t sequenceNumber;
+				switch(recvBuf->flag) {
+					case FLAG_MSG_ACK:
+						sequenceNumber = *(uint32_t *)((uint8_t *)recvBuf+kChatHeaderSize);
+						break;
+					default:
+						sequenceNumber = recvBuf->sequenceNumber;
+						break;
+				}
+				if (sequenceNumber == sendHeader->sequenceNumber) {
+					if (inPacket != NULL) {
 						*inPacket = (uint8_t *)recvBuf;
 					}
 					else {
@@ -64,6 +101,224 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 					}
 					return;
 				}
+
+			}
+		}
+	}
+}
+
+void sendMessageACK(uint32_t sequenceNumber, char *handle)
+{
+	uint8_t handleLen = strlen(handle);
+	ssize_t payloadLen = sizeof(uint32_t) + handleLen + 1;
+	uint8_t *payload = malloc(payloadLen);
+	sequenceNumber = htonl(sequenceNumber);
+	memcpy(payload, &sequenceNumber, sizeof(uint32_t));
+	memcpy(payload+sizeof(uint32_t), &handleLen, sizeof(uint8_t));
+	memcpy(payload+sizeof(uint32_t)+sizeof(uint8_t), handle, handleLen);
+
+	ssize_t packetLen = kChatHeaderSize + payloadLen;
+	struct ChatHeader *packet = (struct ChatHeader *)makePacket(FLAG_MSG_ACK, payload, payloadLen);
+
+	ssize_t numBytes;
+	if((numBytes = send(gClient->socket, packet, packetLen, 0)) < 0) {
+		perror("sendMessageACK:send");
+		return;
+	}
+
+	free(payload);
+	free(packet);
+}
+
+void readPacketFromSocket(int sock)
+{
+	struct ChatHeader *recvBuf = malloc(MAX_PACKET_SIZE);
+	ssize_t numBytes;
+	if ((numBytes = recv(sock, (uint8_t *)recvBuf, MAX_PACKET_SIZE, 0)) < 0) {
+		perror("readPacketFromSocket:recv");
+		return;
+	}
+	else if (numBytes == 0) {
+		fprintf(stderr, "ERROR: Server has closed the socket\n");
+		exit(1);
+	}
+
+	char *index;
+	char fromHandle[MAX_HANDLE_LENGTH];
+	uint8_t fromHandleLen;
+
+	switch (recvBuf->flag) {
+		case FLAG_MSG_REQ:
+			index = (char *)recvBuf + kChatHeaderSize + 1 + strlen(gClient->handle);
+			fromHandleLen = *index;
+			memcpy(fromHandle, index+1, fromHandleLen);
+			fromHandle[fromHandleLen] = '\0';
+			index += fromHandleLen + 1;
+			printf("\n%s: %s", fromHandle, index);
+			sendMessageACK(recvBuf->sequenceNumber, fromHandle);
+			break;
+		default:
+			fprintf(stderr, "ERROR: Unknown packet type %d\n", recvBuf->flag);
+			break;
+	}
+
+	free(recvBuf);
+}
+
+
+void sendMessage(char *toHandle, char *message)
+{
+	uint8_t toHandleLen = strlen(toHandle);
+	uint8_t fromHandleLen = strlen(gClient->handle);
+	ssize_t payloadLen = 3 + toHandleLen + fromHandleLen + strlen(message);
+	uint8_t *payload = malloc(payloadLen);
+	ssize_t offset = 0;
+
+	memcpy(payload+offset, &toHandleLen, sizeof(toHandleLen));
+	offset += sizeof(toHandleLen);
+	memcpy(payload+offset, toHandle, toHandleLen);
+	offset += toHandleLen;
+
+	memcpy(payload+offset, &fromHandleLen, sizeof(fromHandleLen));
+	offset += sizeof(fromHandleLen);
+	memcpy(payload+offset, gClient->handle, fromHandleLen);
+	offset += fromHandleLen;
+
+	memcpy(payload+offset, message, strlen(message)+1);
+
+	uint8_t *outPacket = makePacket(FLAG_MSG_REQ, payload, payloadLen);
+	ssize_t outPacketLen = kChatHeaderSize + payloadLen;
+
+	ssize_t responseLen;
+	struct ChatHeader *responseHeader;
+
+	sendWait(outPacket, outPacketLen, (uint8_t **)&responseHeader, &responseLen);
+
+	char badHandle[MAX_HANDLE_LENGTH];
+	uint8_t badHandleLen;
+	if (responseHeader != NULL) {
+		switch(responseHeader->flag) {
+			case FLAG_MSG_ACK:
+				break;
+			case FLAG_MSG_ERR:
+				badHandleLen = *((uint8_t *)responseHeader + kChatHeaderSize);
+				memcpy(badHandle, ((uint8_t *)responseHeader + kChatHeaderSize + 1), badHandleLen);
+				badHandle[badHandleLen] = '\0';
+				fprintf(stderr, "ERROR: No record of handle %s on server\n", badHandle);
+				break;
+			default:
+				fprintf(stderr, "ERROR: Unexpected header flag (%d)\n", responseHeader->flag);
+				exit(1);
+				break;
+		}
+
+		free(responseHeader);
+	}
+
+	free(outPacket);
+	free(payload);
+}
+
+void doMessage(char *buffer)
+{
+	ssize_t bufferLen = strlen(buffer);
+	char *index = buffer;
+
+	while(isspace(*index))
+		index++;
+	if ((index-buffer) >= bufferLen) {
+		fprintf(stderr, "ERROR: usage: \%m <handle> [message]\n");
+		return;
+	}
+	char *handle = index;
+
+	while(!isspace(*index))
+		index++;
+	if ((index-buffer) >= bufferLen) {
+		fprintf(stderr, "ERROR: usage: \%m <handle> [message]\n");
+		return;
+	}
+
+
+	ssize_t handleLen = index - handle;
+	if (handleLen > MAX_HANDLE_LENGTH) {
+		fprintf(stderr, "ERROR: Handle exceeds maximum allowed length\n");
+		return;
+	}
+	*index = '\0';
+	index++;
+
+	while(isspace(*index))
+		index++;
+
+	char *message;
+	ssize_t messageLength;
+	if ((index-buffer) >= bufferLen) {
+		message = "";
+		messageLength = 0;
+	}
+	else {
+		message = index;
+		messageLength = strlen(message);
+	}
+
+	if (messageLength > MAX_MESSAGE_LENGTH) {
+		fprintf(stderr, "ERROR: Message exceeds maximum allowed length\n");
+		return;
+	}
+
+
+
+	sendMessage(handle, message);
+}
+
+void handleUserInput()
+{
+	char inputBuf[MAX_PACKET_SIZE];
+	if (fgets(inputBuf, MAX_PACKET_SIZE, stdin) == NULL) {
+		return;
+	}
+
+	if (!strncmp(inputBuf, "\%M", 2) || !strncmp(inputBuf, "\%m", 2)) {
+		doMessage(inputBuf+2);
+	}
+	else if (!strncmp(inputBuf, "\%L", 2) || !strncmp(inputBuf, "\%l", 2)) {
+		printf("Message\n");
+	}
+	else if (!strncmp(inputBuf, "\%E", 2) || !strncmp(inputBuf, "\%e", 2)) {
+		cleanupClient();
+		exit(0);
+	}
+}
+
+void mainEventLoop()
+{
+	int selectStatus;
+	fd_set fdSet;
+
+	for (;;) {
+		printf("> ");
+		fflush(stdout);
+
+		for (;;) {
+			FD_ZERO(&fdSet);
+			FD_SET(gClient->socket, &fdSet);
+			FD_SET(STDIN_FILENO, &fdSet);
+			if ((selectStatus = select(gClient->socket+1, &fdSet, NULL, NULL, NULL)) < 0) {
+				perror("sendWait:select");
+				exit(1);
+			}
+			else if (selectStatus > 0) {
+				if (FD_ISSET(gClient->socket, &fdSet) || FD_ISSET(STDIN_FILENO, &fdSet)) {
+					if (FD_ISSET(gClient->socket, &fdSet)) {
+						readPacketFromSocket(gClient->socket);
+					}
+
+					if (FD_ISSET(STDIN_FILENO, &fdSet)) {
+						handleUserInput();
+					}
+					break;
+				}
 			}
 		}
 	}
@@ -71,41 +326,40 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 
 void registerHandle()
 {
-	struct ChatHeader packetHeader;
-	packetHeader.sequenceNumber = 1;
-	packetHeader.flag = FLAG_INIT_REQ;
-
 	uint8_t handleLen = strlen(gClient->handle);
 	uint8_t *data = malloc(handleLen + 1);
 	data[0] = handleLen;
 	memcpy(data+1, gClient->handle, handleLen);
 
 	ssize_t outPacketLen = handleLen + 1 + kChatHeaderSize;
-	uint8_t *outPacket = makePacket(packetHeader, data, handleLen + 1);
+	uint8_t *outPacket = makePacket(FLAG_INIT_REQ, data, handleLen + 1);
 
-	ssize_t inPacketLen;
-	uint8_t *inPacket;
+	ssize_t responseLen;
+	struct ChatHeader *responseHeader;
 
-	sendWait(outPacket, outPacketLen, &inPacket, &inPacketLen);
+	sendWait(outPacket, outPacketLen, (uint8_t **)&responseHeader, &responseLen);
 
-	struct ChatHeader *responseHeader = (struct ChatHeader *)inPacket;
-	switch(responseHeader->flag) {
-		case FLAG_INIT_ACK:
-			printf("Handle Registered!\n");
-			break;
-		case FLAG_INIT_ERR:
-			fprintf(stderr, "ERROR:Could not register handle with server\n");
-			exit(1);
-			break;
-		default:
-			break;
+	if (responseHeader != NULL) {
+		switch(responseHeader->flag) {
+			case FLAG_INIT_ACK:
+				break;
+			case FLAG_INIT_ERR:
+				fprintf(stderr, "ERROR: Could not register handle with server\n");
+				exit(1);
+				break;
+			default:
+				fprintf(stderr, "ERROR: Unexpected header flag (%d)\n", responseHeader->flag);
+				exit(1);
+				break;
+		}
+
+		free(responseHeader);
 	}
-
-	free(inPacket);
+	free(outPacket);
 }
 
 //************************************************************************************
-//** Connection Setup
+//** Connection Setup & teardown
 //************************************************************************************
 
 int connectToServer(char *serverHostName, uint16_t serverPort)
@@ -138,6 +392,20 @@ int connectToServer(char *serverHostName, uint16_t serverPort)
 
 void cleanupClient()
 {
+	uint8_t *cleanupHeader = makePacket(FLAG_EXIT_REQ, NULL, 0);
+	struct ChatHeader *cleanupResponse;
+	ssize_t cleanupResponseLen;
+	sendWait(cleanupHeader, kChatHeaderSize, (uint8_t **)&cleanupResponse, &cleanupResponseLen);
+
+	if (cleanupResponse != NULL) {
+		if(cleanupResponse->flag != FLAG_EXIT_ACK) {
+			fprintf(stderr, "ERROR: Invalid Acknowledgment of Shutdown from server\n");
+		}
+		free(cleanupResponse);
+	}
+
+	free(cleanupHeader);
+
 	close(gClient->socket);
     free(gClient);
     gClient = NULL;
@@ -157,6 +425,10 @@ int main(int argc, char *argv[])
     }
 
     // Save handle
+    if (strlen(argv[1]) >  MAX_HANDLE_LENGTH) {
+    	fprintf(stderr, "ERROR: Handle exceeds maximum allowed length\n");
+    	exit(1);
+    }
     strncpy(gClient->handle, argv[1], MAX_HANDLE_LENGTH);
 
     // TODO: argv[2] error
@@ -164,6 +436,10 @@ int main(int argc, char *argv[])
     gClient->socket = connectToServer(argv[3], atoi(argv[4]));
 
     registerHandle();
+
+    mainEventLoop();
+
+  	// Never Reached
 
     exit(0);
 }
