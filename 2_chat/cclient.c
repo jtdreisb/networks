@@ -58,7 +58,7 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 
 	for (i = 0; i < MAX_SEND_RETRIES ; i++) {
 		// send packet
-		if((numBytes = send(gClient->socket, outPacket, outPacketLen, 0)) < 0) {
+		if((numBytes = sendErr(gClient->socket, outPacket, outPacketLen, 0)) < 0) {
 			perror("sendWait:send");
 			return;
 		}
@@ -124,7 +124,7 @@ void sendMessageACK(uint32_t sequenceNumber, char *handle)
 	struct ChatHeader *packet = (struct ChatHeader *)makePacket(FLAG_MSG_ACK, payload, payloadLen);
 
 	ssize_t numBytes;
-	if((numBytes = send(gClient->socket, packet, packetLen, 0)) < 0) {
+	if((numBytes = sendErr(gClient->socket, packet, packetLen, 0)) < 0) {
 		perror("sendMessageACK:send");
 		return;
 	}
@@ -503,7 +503,14 @@ int main(int argc, char *argv[])
     }
     strncpy(gClient->handle, argv[1], MAX_HANDLE_LENGTH);
 
-    // TODO: argv[2] error
+    double errorRate;
+    sscanf(argv[2], "%lf", &errorRate);
+
+	sendErr_init(errorRate,
+		DROP_ON,
+		FLIP_ON,
+		DEBUG_OFF,
+		RSEED_OFF);
 
     gClient->socket = connectToServer(argv[3], atoi(argv[4]));
 

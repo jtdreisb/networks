@@ -431,7 +431,7 @@ int main(int argc, char const *argv[])
 	sendErr_init(errorRate,
 		DROP_ON,
 		FLIP_ON,
-		DEBUG_ON,
+		DEBUG_OFF,
 		RSEED_OFF);
 
 	clientList->maxSocket = DEFAULT_MAX_SOCKET;
