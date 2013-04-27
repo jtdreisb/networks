@@ -104,7 +104,7 @@ void removeClient(struct ClientNode *client)
 {
 	struct ClientNode *node = clientList->firstClient;
 	if (node == client) {
-		clientList->firstClient = NULL;
+		clientList->firstClient = node->nextClient;
 		node = NULL;
 	}
 	else {
