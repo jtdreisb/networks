@@ -104,7 +104,6 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 					}
 					return;
 				}
-
 			}
 		}
 	}
@@ -202,6 +201,7 @@ void sendMessage(char *toHandle, char *message)
 	if (responseHeader != NULL) {
 		switch(responseHeader->flag) {
 			case FLAG_MSG_ACK:
+				fprintf(stderr, "ACK:\n");
 				break;
 			case FLAG_MSG_ERR:
 				badHandleLen = *((uint8_t *)responseHeader + kChatHeaderSize);
