@@ -44,7 +44,7 @@ struct ChatHeader {
 extern "C" {
 #endif
 
-uint8_t *makePacket(HeaderFlag flag, uint8_t *data, ssize_t dataLen);
+uint8_t *makePacket(struct ChatHeader header, uint8_t *data, ssize_t dataLen);
 unsigned short in_cksum(unsigned short *addr, int len);
 
 #ifdef __cplusplus

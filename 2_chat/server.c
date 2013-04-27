@@ -3,14 +3,17 @@
 // Jason Dreisbach
 #include "cpe464.h"
 
-
 #define MAX_PENDING_CLIENTS 1024
-#define MAX_PACKET_SIZE 1256
+#define MAX_PACKET_SIZE 2048
 #define DEFAULT_MAX_SOCKET 3
+
 struct ClientNode {
 	int clientSocket;
 	char *clientName;
 	struct ClientNode *nextClient;
+	// Used when handling incoming packets
+	struct ChatHeader *packetData;
+	ssize_t packetLength;
 };
 
 struct ClientList {
@@ -31,9 +34,10 @@ struct ClientNode *clientNamed(char *name)
 {
 	struct ClientNode *node = clientList->firstClient;
 	while (node != NULL) {
-		if (strcmp(name, node->clientName) == 0) {
+		if (node->clientName && (strcmp(name, node->clientName) == 0)) {
 			break;
 		}
+		node = node->nextClient;
 	}
 	return node;
 }
@@ -129,10 +133,8 @@ void removeClient(struct ClientNode *client)
 //** Request Handling
 //************************************************************************************
 
-
-
-void registerHandle(struct ClientNode *client, uint8_t *buf, ssize_t bufLen);
-void forwardMessage(struct ClientNode *client, uint8_t *buf, ssize_t bufLen);
+void registerHandle(struct ClientNode *client);
+void forwardMessage(struct ClientNode *client);
 void respondToClient(struct ClientNode *client, HeaderFlag flag, uint8_t *data, ssize_t dataLen);
 
 void handleClient(struct ClientNode *client)
@@ -155,10 +157,12 @@ void handleClient(struct ClientNode *client)
 	}
 	// Parse the buffer
 	else {
-		struct ChatHeader *header = (struct ChatHeader *)buf;
-		switch (header->flag) {
+		client->packetData = (struct ChatHeader *)buf;
+		client->packetLength = bytesRcvd;
+		switch (client->packetData->flag) {
 			case FLAG_INIT_REQ:
-				registerHandle(client, buf, bytesRcvd);
+				printf("Registering Handle!\n");
+				registerHandle(client);
 				break;
 			case FLAG_MSG_REQ:
 
@@ -183,21 +187,28 @@ void handleClient(struct ClientNode *client)
 			default:
 				break;
 		}
+		client->packetData = NULL;
+		client->packetLength = 0;
 	}
 	free(buf);
 }
 
-void registerHandle(struct ClientNode *client, uint8_t *buf, ssize_t bufLen)
+void registerHandle(struct ClientNode *client)
 {
-	char *clientHandle;
+	// HEADER[kChatHeaderSize] handleLen[1] handle[handleLen]
+
+	uint8_t *buf = (uint8_t *)client->packetData;
 	uint8_t handleLen = *(buf + kChatHeaderSize);
-	if (bufLen < (kChatHeaderSize + handleLen)) {
+	// Make sure we have received a buffer big enough to
+	// contain the handle
+	if (client->packetLength < (kChatHeaderSize + handleLen + 1)) {
+		printf("Packet not long enough\n");
 		respondToClient(client, FLAG_INIT_ERR, NULL, 0);
 		removeClient(client);
 		return;
 	}
 
-	clientHandle = malloc(handleLen+1);
+	char *clientHandle = malloc(handleLen+1);
 	if (clientHandle == NULL) {
 		perror("registerHandle:malloc");
 		exit(1);
@@ -206,27 +217,35 @@ void registerHandle(struct ClientNode *client, uint8_t *buf, ssize_t bufLen)
 	memcpy(clientHandle, buf + kChatHeaderSize + 1, handleLen);
 	clientHandle[handleLen] = '\0';
 
-	if (clientNamed(clientHandle) != client) {
+	// Make sure this handle isn't already registered
+	if (clientNamed(clientHandle) && (clientNamed(clientHandle) != client)) {
+		printf("client already in list\n");
 		respondToClient(client, FLAG_INIT_ERR, NULL, 0);
 		removeClient(client);
 		return;
 	}
 
 	client->clientName = clientHandle;
+	printf("registering handle for");
+	printClient(client);
 	respondToClient(client, FLAG_INIT_ACK, NULL, 0);
 }
 
-void forwardMessage(struct ClientNode *client, uint8_t *buf, ssize_t bufLen)
+void forwardMessage(struct ClientNode *client)
 {
 
 }
 
 void respondToClient(struct ClientNode *client, HeaderFlag flag, uint8_t *data, ssize_t dataLen)
 {
-	uint8_t *packet = makePacket(flag, data, dataLen);
-	ssize_t packetLen = kChatHeaderSize + dataLen;
+	struct ChatHeader responseHeader;
+	responseHeader.sequenceNumber = client->packetData->sequenceNumber;
+	responseHeader.flag = flag;
+	uint8_t *packet = makePacket(responseHeader, data, dataLen);
+	ssize_t packetLength = kChatHeaderSize + dataLen;
+
 	ssize_t bytesSent;
-	if ((bytesSent = send(client->clientSocket, packet, packetLen, 0)) < 0) {
+	if ((bytesSent = send(client->clientSocket, packet, packetLength, 0)) < 0) {
 		perror("respondToClient:send");
 	}
 	free(packet);
