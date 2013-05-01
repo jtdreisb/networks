@@ -81,8 +81,9 @@ void sendWait(uint8_t *outPacket, ssize_t outPacketLen, uint8_t **inPacket, ssiz
 					return;
 				}
 				// check for invalid checksum
-				if (in_cksum((uint16_t *)recvBuf, numBytes) != 0)
-					return;
+				if (in_cksum((uint16_t *)recvBuf, numBytes) != 0) {
+					continue;
+				}
 				uint32_t sequenceNumber;
 				switch(recvBuf->flag) {
 					case FLAG_MSG_ACK:
@@ -132,41 +133,71 @@ void sendMessageACK(uint32_t sequenceNumber, char *handle)
 	free(packet);
 }
 
-void readPacketFromSocket(int sock)
+int verifyPacketFromClient(struct ChatHeader *packet, ssize_t packetLength)
 {
+	int didOutput = 0;
+	if (in_cksum((uint16_t *)packet, packetLength) != 0) {
+		return didOutput;
+	}
+
+	char *index, *fromHandle;
+	uint8_t fromHandleLen;
+
+	index = (char *)packet + kChatHeaderSize + 1 + strlen(gClient->handle);
+	fromHandleLen = *index;
+
+	fromHandle = malloc(fromHandleLen+1);
+	memcpy(fromHandle, index+1, fromHandleLen);
+	fromHandle[fromHandleLen] = '\0';
+	index += fromHandleLen + 1;
+
+	struct ClientNode *client = clientNamed(fromHandle);
+	if (client == NULL) {
+		client = newClient();
+		client->clientName = fromHandle;
+	}
+	else {
+		free(fromHandle);
+		fromHandle = NULL;
+	}
+
+	uint32_t incomingSequenceNumber = ntohl(packet->sequenceNumber);
+	if (client->sequenceNumber < incomingSequenceNumber) {
+		client->sequenceNumber = incomingSequenceNumber;
+		printf("\n%s: %s", client->clientName, index);
+		didOutput = 1;
+	}
+	sendMessageACK(incomingSequenceNumber, client->clientName);
+	return didOutput;
+}
+
+int readPacketFromSocket(int sock)
+{
+	int didOutput = 0;
 	struct ChatHeader *recvBuf = malloc(MAX_PACKET_SIZE);
 	ssize_t numBytes;
 	if ((numBytes = recv(sock, (uint8_t *)recvBuf, MAX_PACKET_SIZE, 0)) < 0) {
 		perror("readPacketFromSocket:recv");
-		return;
+		return 1;
 	}
 	else if (numBytes == 0) {
 		fprintf(stderr, "ERROR: Server has closed the socket\n");
 		exit(1);
 	}
 
-	char *index;
-	char fromHandle[MAX_HANDLE_LENGTH];
-	uint8_t fromHandleLen;
-
 	switch (recvBuf->flag) {
 		case FLAG_MSG_REQ:
-			index = (char *)recvBuf + kChatHeaderSize + 1 + strlen(gClient->handle);
-			fromHandleLen = *index;
-			memcpy(fromHandle, index+1, fromHandleLen);
-			fromHandle[fromHandleLen] = '\0';
-			index += fromHandleLen + 1;
-			printf("\n%s: %s", fromHandle, index);
-			sendMessageACK(recvBuf->sequenceNumber, fromHandle);
+			didOutput = verifyPacketFromClient(recvBuf, numBytes);
 			break;
 		default:
 			fprintf(stderr, "ERROR:readPacketFromSocket Unknown packet type %d\n", recvBuf->flag);
+			didOutput = 1;
 			break;
 	}
 
 	free(recvBuf);
+	return didOutput;
 }
-
 
 void sendMessage(char *toHandle, char *message)
 {
@@ -175,6 +206,11 @@ void sendMessage(char *toHandle, char *message)
 	ssize_t payloadLen = 3 + toHandleLen + fromHandleLen + strlen(message);
 	uint8_t *payload = malloc(payloadLen);
 	ssize_t offset = 0;
+
+	if (strncmp(toHandle, gClient->handle, MAX_HANDLE_LENGTH) == 0) {
+		printf("%s: %s", toHandle, message);
+		return;
+	}
 
 	memcpy(payload+offset, &toHandleLen, sizeof(toHandleLen));
 	offset += sizeof(toHandleLen);
@@ -201,7 +237,7 @@ void sendMessage(char *toHandle, char *message)
 	if (responseHeader != NULL) {
 		switch(responseHeader->flag) {
 			case FLAG_MSG_ACK:
-				fprintf(stderr, "ACK:\n");
+				// okay!
 				break;
 			case FLAG_MSG_ERR:
 				badHandleLen = *((uint8_t *)responseHeader + kChatHeaderSize);
@@ -382,7 +418,12 @@ void mainEventLoop()
 			else if (selectStatus > 0) {
 				if (FD_ISSET(gClient->socket, &fdSet) || FD_ISSET(STDIN_FILENO, &fdSet)) {
 					if (FD_ISSET(gClient->socket, &fdSet)) {
-						readPacketFromSocket(gClient->socket);
+						if (readPacketFromSocket(gClient->socket)) {
+							break;
+						}
+						else {
+							continue;
+						}
 					}
 
 					if (FD_ISSET(STDIN_FILENO, &fdSet)) {

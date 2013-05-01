@@ -5,129 +5,22 @@
 
 #define MAX_PENDING_CLIENTS 1024
 #define MAX_PACKET_SIZE 2048
-#define DEFAULT_MAX_SOCKET 3
 
-struct ClientNode {
-	int clientSocket;
-	char *clientName;
-	struct ClientNode *nextClient;
-	// Used when handling incoming packets
-	struct ChatHeader *packetData;
-	ssize_t packetLength;
-};
-
-struct ClientList {
-	struct ClientNode *firstClient;
-	struct ClientNode *lastClient;
-	int maxSocket;
-};
-
-struct ClientList _clientList;
-struct ClientList *clientList = &_clientList;
-
-
-
-//************************************************************************************
-//** Client List Utility Functions
-//************************************************************************************
-
-struct ClientNode *clientNamed(char *name)
-{
-	struct ClientNode *node = clientList->firstClient;
-	while (node != NULL) {
-		if (node->clientName && (strcmp(name, node->clientName) == 0)) {
-			break;
-		}
-		node = node->nextClient;
-	}
-	return node;
-}
-
-void printClient(struct ClientNode *node)
-{
-	printf("Node:\n"
-		"\tName: %s\n"
-		"\tSocket: %d\n",
-		node->clientName,
-		node->clientSocket);
-}
-
-void printClientList()
-{
-	printf("ClientList:\n================\n");
-	int clientCount = 0;
-	struct ClientNode *client = clientList->firstClient;
-	while (client != NULL) {
-		printf("%d ", ++clientCount);
-		printClient(client);
-		client = client->nextClient;
-	}
-	printf("%d active Clients\n", clientCount);
-	printf("Max Socket: %d\n", clientList->maxSocket);
-}
-
-//************************************************************************************
-//** Client Addition and Removal
-//************************************************************************************
 void acceptNewClient(int serverSocket)
 {
 	struct sockaddr_in newClientAddress;
 	socklen_t sockLength = sizeof(newClientAddress);
-	struct ClientNode *newClient = malloc(sizeof(struct ClientNode));
-	if (newClient == NULL) {
-		perror("acceptNewClient:malloc");
-		exit(-6);
-	}
+	struct ClientNode *client =  newClient();
 
-	memset(newClient, 0, sizeof(struct ClientNode));
-
-	if ((newClient->clientSocket = accept(serverSocket, (struct sockaddr *) &newClientAddress, &sockLength)) < 0) {
+	if ((client->clientSocket = accept(serverSocket, (struct sockaddr *) &newClientAddress, &sockLength)) < 0) {
 		perror("acceptNewClient:accept");
-		free(newClient);
+		free(client);
 		return;
 	}
 
-	if ((clientList->firstClient == NULL) || (clientList->lastClient == NULL)) {
-		clientList->firstClient = newClient;
-		clientList->lastClient = newClient;
+	if (clientList->maxSocket < client->clientSocket) {
+		clientList->maxSocket = client->clientSocket;
 	}
-	else {
-		clientList->lastClient->nextClient = newClient;
-		clientList->lastClient = newClient;
-	}
-	if (clientList->maxSocket < newClient->clientSocket) {
-		clientList->maxSocket = newClient->clientSocket;
-	}
-}
-
-void removeClient(struct ClientNode *client)
-{
-	struct ClientNode *node = clientList->firstClient;
-	if (node == client) {
-		clientList->firstClient = node->nextClient;
-		node = NULL;
-	}
-	else {
-		while (node != NULL) {
-			if (node->nextClient == client) {
-				node->nextClient = client->nextClient;
-				break;
-			}
-			node = node->nextClient;
-		}
-	}
-	if (clientList->lastClient == client) {
-		clientList->lastClient = node;
-	}
-	if (client->clientSocket == clientList->maxSocket) {
-		if (clientList->firstClient == NULL) {
-			clientList->maxSocket = DEFAULT_MAX_SOCKET;
-		}
-	}
-	close(client->clientSocket);
-	if (client->clientName != NULL)
-		free(client->clientName);
-	free(client);
 }
 
 //************************************************************************************
@@ -137,7 +30,7 @@ uint8_t *makePacket(struct ChatHeader header, uint8_t *data, ssize_t dataLen);
 void registerHandle(struct ClientNode *client);
 void clientExit(struct ClientNode *client);
 void forwardMessage(struct ClientNode *client);
-void clientCount(struct ClientNode *client);
+void getClientCount(struct ClientNode *client);
 void clientNameRequest(struct ClientNode *client);
 void respondToClient(struct ClientNode *client, HeaderFlag flag, uint8_t *data, ssize_t dataLen);
 
@@ -166,9 +59,6 @@ void handleClient(struct ClientNode *client)
 		// make sure the checksum is correct before parsing the packets
 		if (in_cksum((uint16_t *)client->packetData, client->packetLength) == 0) {
 			// Put the packet header fields in host order
-			client->packetData->sequenceNumber = ntohl(client->packetData->sequenceNumber);
-			client->packetData->checksum = ntohs(client->packetData->checksum);
-
 			switch (client->packetData->flag) {
 				case FLAG_INIT_REQ:
 					registerHandle(client);
@@ -181,7 +71,7 @@ void handleClient(struct ClientNode *client)
 					clientExit(client);
 					break;
 				case FLAG_LIST_REQ:
-					clientCount(client);
+					getClientCount(client);
 					break;
 				case FLAG_HNDL_REQ:
 					clientNameRequest(client);
@@ -202,15 +92,9 @@ void handleClient(struct ClientNode *client)
 	free(buf);
 }
 
-void clientCount(struct ClientNode *client)
+void getClientCount(struct ClientNode *client)
 {
-	uint32_t numClients;
-	struct ClientNode *index = clientList->firstClient;
-	for (numClients = 0; index != NULL; index = index->nextClient) {
-		if (index->clientName != NULL)
-			numClients++;
-	}
-	numClients = htonl(numClients);
+	uint32_t numClients = clientCount();
 	respondToClient(client, FLAG_LIST_RESP, (uint8_t *)&numClients, sizeof(uint32_t));
 }
 
@@ -296,7 +180,6 @@ void forwardMessage(struct ClientNode *client)
 			break;
 	}
 
-
 	uint8_t handleSize = *index;
 	memcpy(handle, index+1, handleSize);
 	handle[handleSize] = '\0';
@@ -316,7 +199,8 @@ void forwardMessage(struct ClientNode *client)
 void respondToClient(struct ClientNode *client, HeaderFlag flag, uint8_t *data, ssize_t dataLen)
 {
 	struct ChatHeader responseHeader;
-	responseHeader.sequenceNumber = client->packetData->sequenceNumber;
+	responseHeader.sequenceNumber = ntohl(client->packetData->sequenceNumber);
+	responseHeader.checksum = ntohs(client->packetData->checksum);
 	responseHeader.flag = flag;
 	uint8_t *packet = makePacket(responseHeader, data, dataLen);
 	ssize_t packetLength = kChatHeaderSize + dataLen;

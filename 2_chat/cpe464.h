@@ -9,12 +9,17 @@
  * a 16-bit, unsigned short
  */
 
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-
 
 typedef enum {
     FLAG_INIT_REQ = 1,
@@ -41,13 +46,35 @@ struct ChatHeader {
 #define MAX_HANDLE_LENGTH 255
 #define MAX_MESSAGE_LENGTH 1000
 #define MAX_PACKET_SIZE 2048
+#define DEFAULT_MAX_SOCKET 3
 
 #define kChatHeaderSize sizeof(struct ChatHeader)
 
+struct ClientNode {
+    int clientSocket;
+    char *clientName;
+    struct ClientNode *nextClient;
+    // Used when handling incoming packets
+    struct ChatHeader *packetData;
+    ssize_t packetLength;
+    // Holds the sequence number
+    uint32_t sequenceNumber;
+};
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct ClientList {
+    struct ClientNode *firstClient;
+    struct ClientNode *lastClient;
+    int maxSocket;
+};
+
+extern struct ClientList *clientList;
+
+struct ClientNode *clientNamed(char *name);
+uint32_t clientCount();
+void printClient(struct ClientNode *node);
+void printClientList();
+struct ClientNode *newClient();
+void removeClient(struct ClientNode *client);
 
 unsigned short in_cksum(unsigned short *addr, int len);
 
