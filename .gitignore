@@ -34,3 +34,13 @@ Icon
 # Sublime Text
 # SublimeText project files
 *.sublime-workspace
+
+3_selective_reject/libcpe464
+
+3_selective_reject/example.mk
+
+3_selective_reject/rcopy
+
+3_selective_reject/server
+
+3_selective_reject/test
