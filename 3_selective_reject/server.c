@@ -172,7 +172,7 @@ STATE send_next_data(Connection *client, Window *window)
 
 void send_data(Connection *client, Window *window, uint32_t seq_num)
 {
-	printf("RESEND %u\n", seq_num); // !!!
+	// printf("RESEND %u\n", seq_num); // !!!
 
 	uint32_t window_index = (seq_num-1) % window->window_size;
 
@@ -213,14 +213,14 @@ STATE read_acks(Connection *client, Window *window, int nest_level)
 					break;
 
 				case FLAG_ACK:
-					printf("-ACK %u\n", seq_num);
+					// printf("-ACK %u\n", seq_num);
 					for (i=0; i < window_index; i++) {
 						window->registry[i] = 1;
 					}
 					break;
 
 				case FLAG_SREJ:
-					printf("-SREJ %u\n", seq_num);
+					// printf("-SREJ %u\n", seq_num);
 					send_data(client, window, seq_num);
 					break;
 
@@ -237,7 +237,7 @@ STATE read_acks(Connection *client, Window *window, int nest_level)
 STATE next_window(Window *window, int data_file)
 {
 	int32_t len_read = 0;
-	printf("Loading window base: %u length: %u size: %u\n", window->base_seq_num, window->block_size, window->window_size); // !!!
+	// printf("Loading window base: %u length: %u size: %u\n", window->base_seq_num, window->block_size, window->window_size); // !!!
 	len_read = read(data_file, window->buffer, window->buffer_size);
 	clearWindow(window);
 	window->window_index = 0;
@@ -272,7 +272,7 @@ STATE close_window(Connection *client, Window *window, int nest_level)
 	for (;;) {
 
 		if (windowIsFull(window)) {
-			printf("!!! Window Full next_base: %u\n", nextOpenSequenceNumber(window));
+			// printf("!!! Window Full next_base: %u\n", nextOpenSequenceNumber(window));
 			window->base_seq_num = nextOpenSequenceNumber(window);
 			return STATE_WINDOW_NEXT;
 		}
@@ -294,12 +294,12 @@ STATE close_window(Connection *client, Window *window, int nest_level)
 						for (i= 0; i <= window_index; i++) {
 							window->registry[i] = 1;
 						}
-						printf("ACK %u\n", window_index);
+						// printf("ACK %u\n", seq_num);
 						break;
 
 					case FLAG_SREJ:
 						send_count = 0;
-						printf("SREJ %u\n", window_index);
+						// printf("SREJ %u\n", seq_num);
 						send_data(client, window, seq_num);
 						break;
 
@@ -315,7 +315,7 @@ STATE close_window(Connection *client, Window *window, int nest_level)
 				fprintf(stderr, "ERROR: No Response from client in 10 seconds");
 				exit(1);
 			}
-			printf("Timeout!\n"); // !!!
+			// printf("Timeout!\n"); // !!!
 			send_data(client, window, window->base_seq_num);
 		}
 	}

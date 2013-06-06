@@ -173,7 +173,7 @@ STATE recv_data(Window *window)
 			max_seq_num = maxSequenceNumber(window);
 			next_seq_num = nextOpenSequenceNumber(window);
 
-			printf("PACKET: seq_num: %u max: %u next: %u exp: %u\n", seq_num, max_seq_num, next_seq_num, expected_seq_number);
+			// printf("PACKET: seq_num: %u max: %u next: %u exp: %u\n", seq_num, max_seq_num, next_seq_num, expected_seq_number);
 
 			if (seq_num < next_seq_num) {
 				if (seq_num < window->base_seq_num) {
@@ -212,9 +212,6 @@ STATE recv_data(Window *window)
 			}
 
 
-
-
-
 			if (seq_num > next_seq_num) {
 				// the previous sequence number
 				window_index = ((seq_num-1) % window->window_size);
@@ -229,14 +226,14 @@ STATE recv_data(Window *window)
 			expected_seq_number = next_seq_num;
 
 			if (windowIsFull(window)) {
-				printf("Window Full\n");
+				// printf("Window Full\n");
 				return STATE_WINDOW_FULL;
 			}
 
 			break;
 
 		case FLAG_END_OF_FILE:
-			printf("GOT EOF: seq_num: %u\n", seq_num);// !!!
+			// printf("GOT EOF: seq_num: %u\n", seq_num);// !!!
 			return STATE_EOF;
 			break;
 
@@ -276,13 +273,13 @@ STATE recv_eof(Window *window, int output_fd)
 
 void send_ack(int seq_num)
 {
-	printf("SEND ACK: %u\n", seq_num);
+	// printf("SEND ACK: %u\n", seq_num);
 	send_buf(NULL, 0, &server, FLAG_ACK, seq_num);
 }
 
 void send_srej(int seq_num)
 {
-	printf("SEND SREJ: %u\n", seq_num);
+	// printf("SEND SREJ: %u\n", seq_num);
 	send_buf(NULL, 0, &server, FLAG_SREJ, seq_num);
 }
 
