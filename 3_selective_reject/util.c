@@ -14,29 +14,91 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include "util.h"
+#include <math.h>
 #include "cpe464.h"
+
+Window *newWindowWithSizeAndBuffer(uint32_t window_size, uint32_t buffer_size)
+{
+  Window *window = malloc(sizeof(Window));
+  window->base_seq_num = START_SEQ_NUM;
+  window->window_size = window_size;
+  window->block_size = buffer_size;
+  window->buffer_size = window_size * buffer_size;
+  window->registry = malloc(window_size);
+  window->buffer = malloc(window_size * buffer_size);
+  window->data_len = window->block_size * window->window_size;
+  clearWindow(window);
+  return window;
+}
+
+void clearWindow(Window *window)
+{
+  window->window_index = 0;
+  memset(window->registry, 0, window->window_size);
+}
+
+int32_t windowIsFull(Window *window)
+{
+  int32_t window_size = (int32_t) ceil((1.0 * window->data_len) / window->block_size);
+  int i;
+  for (i = 0; i < window_size; i++) {
+    if(window->registry[i] == 0) {
+      return 0; // Not full: found an empty spot
+    }
+  }
+
+  return 1; // Full: not empty spots filled
+}
+
+uint32_t maxSequenceNumber(Window *window)
+{
+  uint32_t max_window_index = 0;
+  int i = 0;
+  for (i = 0; i < window->window_size; i++) {
+    if(window->registry[i] == 1) {
+      max_window_index = i;
+    }
+  }
+  return window->base_seq_num + max_window_index;
+}
+
+uint32_t nextOpenSequenceNumber(Window *window)
+{
+  int i;
+  for (i = 0; i < window->window_size; i++) {
+    if(window->registry[i] == 0) {
+      break;
+    }
+  }
+  return window->base_seq_num + i;
+}
+
+void destroyWindow(Window *window)
+{
+  if (window != NULL) {
+    if (window->buffer != NULL)
+      free(window->buffer);
+    if(window->registry != NULL)
+      free(window->registry);
+    free(window);
+  }
+}
 
 int32_t startServer()
 {
-
   int sk = 0;     // socket descriptor
   struct sockaddr_in  local ;   // socket address for us
   uint32_t len = sizeof(local) ;  // length of local address
 
+  if ((sk = socket(AF_INET,SOCK_DGRAM,0)) < 0) {
+    perror("socket");
+    exit(-1);
+  }
 
-  // create the socket
-  if ((sk = socket(AF_INET,SOCK_DGRAM,0)) < 0)
-    {
-      perror("socket");
-      exit(-1);
-    }
+  local.sin_family = AF_INET ;
+  local.sin_addr.s_addr = INADDR_ANY ;
+  local.sin_port = htons(0);
 
-  // set up the socket
-  local.sin_family = AF_INET ;         // internet family
-  local.sin_addr.s_addr = INADDR_ANY ; // wild card machine address
-  local.sin_port = htons(0);           // let system choose the port
-
-  // bind the name (address) to a port
   if (bind(sk,(struct sockaddr *)&local,sizeof(local)) < 0)
     {
       perror("udp_server, bind");
@@ -154,8 +216,9 @@ int32_t recv_buf(uint8_t *buf, uint32_t len, int32_t recv_sock, Connection *conn
 }
 
 
-int32_t send_buf(uint8_t *buf, uint32_t len, Connection *conn, uint8_t flag, uint32_t seq_num, uint8_t *packet)
+int32_t send_buf(uint8_t *buf, uint32_t len, Connection *conn, uint8_t flag, uint32_t seq_num)
 {
+  uint8_t packet[MAX_PACKET_LEN];
   int32_t send_len = 0;
   uint16_t checksum = 0;
 
@@ -164,11 +227,10 @@ int32_t send_buf(uint8_t *buf, uint32_t len, Connection *conn, uint8_t flag, uin
   }
 
   seq_num = htonl(seq_num);
-  memcpy(&packet[0], &seq_num, 4);
+  memcpy(packet, &seq_num, 4);
   packet[6] = flag;
 
   memset(&packet[4], 0, 2);
-
   checksum = in_cksum((unsigned short *)packet, len+8);
   memcpy(&packet[4], &checksum, 2);
 
